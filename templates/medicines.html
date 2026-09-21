@@ -1,326 +1,151 @@
 {% extends "base.html" %}
 
-{% block title %}
-Medicines - Pharmacy Management System
-{% endblock %}
-
 {% block content %}
 
 <div class="page-header">
-
     <div>
         <h1>Medicines</h1>
-        <p>Manage your pharmacy inventory.</p>
+        <p>Browse and search available medicines.</p>
     </div>
 
-    <div>
-        <a
-            href="{{ url_for('add_medicine') }}"
-            class="btn btn-primary"
-        >
+    {% if current_user.is_authenticated %}
+        <a href="{{ url_for('add_medicine') }}" class="btn btn-primary">
             + Add Medicine
         </a>
-    </div>
-
+    {% endif %}
 </div>
 
 
-<!-- SEARCH -->
+<div class="search-box">
 
-<div class="card">
+    <form method="GET" action="{{ url_for('medicines') }}">
 
-    <form
-        method="GET"
-        action="{{ url_for('medicines') }}"
-        class="search-form"
-    >
+        <input
+            type="text"
+            name="search"
+            value="{{ search }}"
+            placeholder="Search by medicine name, barcode or category..."
+        >
 
-        <div class="form-group">
+        <button type="submit">
+            Search
+        </button>
 
-            <label for="search">
-                Search Medicine
-            </label>
-
-            <input
-                type="text"
-                id="search"
-                name="search"
-                value="{{ search }}"
-                placeholder="Search by medicine name or barcode..."
-            >
-
-        </div>
-
-        <div class="search-buttons">
-
-            <button
-                type="submit"
-                class="btn btn-primary"
-            >
-                Search
-            </button>
-
-            {% if search %}
-
-            <a
-                href="{{ url_for('medicines') }}"
-                class="btn btn-secondary"
-            >
+        {% if search %}
+            <a href="{{ url_for('medicines') }}">
                 Clear
             </a>
-
-            {% endif %}
-
-        </div>
+        {% endif %}
 
     </form>
 
 </div>
 
 
-<!-- MEDICINE INVENTORY -->
-
 <div class="card">
 
-    <div class="table-header">
+    {% if medicines %}
 
-        <div>
+        <div class="table-container">
 
-            <h2>Medicine Inventory</h2>
+            <table>
 
-            {% if search %}
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Barcode</th>
+                        <th>Category</th>
+                        <th>Stock</th>
+                        <th>Purchase Price</th>
+                        <th>Selling Price</th>
+                        <th>Expiry Date</th>
 
-                <p class="table-description">
-                    Search results for:
-                    <strong>{{ search }}</strong>
-                </p>
+                        {% if current_user.is_authenticated %}
+                            <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
 
-            {% else %}
+                <tbody>
 
-                <p class="table-description">
-                    All medicines in inventory.
-                </p>
+                    {% for medicine in medicines %}
 
-            {% endif %}
+                    <tr>
 
-        </div>
+                        <td>
+                            <strong>
+                                {{ medicine.name }}
+                            </strong>
+                        </td>
 
-
-        <div class="medicine-count">
-
-            {{ medicines|length }} medicine(s)
-
-        </div>
-
-    </div>
-
-
-    <div class="table-container">
-
-        <table>
-
-            <thead>
-
-                <tr>
-
-                    <th>ID</th>
-                    <th>Medicine</th>
-                    <th>Barcode</th>
-                    <th>Category</th>
-                    <th>Stock</th>
-                    <th>Purchase Price</th>
-                    <th>Selling Price</th>
-                    <th>Expiry Date</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-
-                </tr>
-
-            </thead>
-
-
-            <tbody>
-
-                {% for medicine in medicines %}
-
-                <tr>
-
-                    <!-- ID -->
-
-                    <td>
-                        {{ medicine.id }}
-                    </td>
-
-
-                    <!-- MEDICINE -->
-
-                    <td>
-
-                        <strong>
-                            {{ medicine.name }}
-                        </strong>
-
-                    </td>
-
-
-                    <!-- BARCODE -->
-
-                    <td>
-
-                        <span class="barcode">
+                        <td>
                             {{ medicine.barcode }}
-                        </span>
+                        </td>
 
-                    </td>
-
-
-                    <!-- CATEGORY -->
-
-                    <td>
-
-                        {% if medicine.category %}
-
+                        <td>
                             {{ medicine.category }}
+                        </td>
 
-                        {% else %}
+                        <td>
 
-                            <span class="muted">
-                                Not specified
-                            </span>
+                            {% if medicine.quantity <= 0 %}
 
-                        {% endif %}
+                                <span class="badge badge-danger">
+                                    Out of stock
+                                </span>
 
-                    </td>
+                            {% elif medicine.quantity <= 10 %}
 
+                                <span class="badge badge-warning">
+                                    {{ medicine.quantity }} left
+                                </span>
 
-                    <!-- STOCK -->
+                            {% else %}
 
-                    <td>
+                                <span class="badge badge-success">
+                                    {{ medicine.quantity }}
+                                </span>
 
-                        {% if medicine.quantity == 0 %}
+                            {% endif %}
 
-                            <span class="stock stock-empty">
-                                0
-                            </span>
+                        </td>
 
-                        {% elif medicine.quantity <= 10 %}
+                        <td>
+                            {{ "%.2f"|format(medicine.purchase_price|float) }}
+                        </td>
 
-                            <span class="stock stock-low">
-                                {{ medicine.quantity }}
-                            </span>
+                        <td>
+                            {{ "%.2f"|format(medicine.selling_price|float) }}
+                        </td>
 
-                        {% else %}
-
-                            <span class="stock stock-good">
-                                {{ medicine.quantity }}
-                            </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- PURCHASE PRICE -->
-
-                    <td>
-
-                        ${{ "%.2f"|format(
-                            medicine.purchase_price|float
-                        ) }}
-
-                    </td>
+                        <td>
+                            {{ medicine.expiry_date }}
+                        </td>
 
 
-                    <!-- SELLING PRICE -->
+                        {% if current_user.is_authenticated %}
 
-                    <td>
-
-                        <strong>
-
-                            ${{ "%.2f"|format(
-                                medicine.selling_price|float
-                            ) }}
-
-                        </strong>
-
-                    </td>
-
-
-                    <!-- EXPIRY DATE -->
-
-                    <td>
-
-                        {{ medicine.expiry_date }}
-
-                    </td>
-
-
-                    <!-- STATUS -->
-
-                    <td>
-
-                        {% if medicine.quantity == 0 %}
-
-                            <span class="badge expired">
-                                Out of Stock
-                            </span>
-
-                        {% elif medicine.quantity <= 10 %}
-
-                            <span class="badge warning">
-                                Low Stock
-                            </span>
-
-                        {% else %}
-
-                            <span class="badge active">
-                                Available
-                            </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- ACTIONS -->
-
-                    <td>
-
-                        <div class="action-buttons">
-
-
-                            <!-- EDIT -->
+                        <td>
 
                             <a
-                                href="{{ url_for(
-                                    'edit_medicine',
-                                    medicine_id=medicine.id
-                                ) }}"
-                                class="btn btn-small btn-primary"
+                                href="{{ url_for('edit_medicine', medicine_id=medicine.id) }}"
+                                class="btn btn-small"
                             >
                                 Edit
                             </a>
-
-
-                            <!-- DELETE ADMIN ONLY -->
 
                             {% if current_user.role == "admin" %}
 
                             <form
                                 method="POST"
-                                action="{{ url_for(
-                                    'delete_medicine',
-                                    medicine_id=medicine.id
-                                ) }}"
+                                action="{{ url_for('delete_medicine', medicine_id=medicine.id) }}"
                                 style="display:inline;"
-                                onsubmit="return confirm(
-                                    'Are you sure you want to delete this medicine?'
-                                );"
+                                onsubmit="return confirm('Are you sure you want to delete this medicine?');"
                             >
 
                                 <button
                                     type="submit"
-                                    class="btn btn-small btn-danger"
+                                    class="btn btn-danger btn-small"
                                 >
                                     Delete
                                 </button>
@@ -329,134 +154,65 @@ Medicines - Pharmacy Management System
 
                             {% endif %}
 
-
-                        </div>
-
-                    </td>
-
-                </tr>
-
-
-                {% else %}
-
-                <!-- EMPTY INVENTORY -->
-
-                <tr>
-
-                    <td
-                        colspan="10"
-                        class="empty-state"
-                    >
-
-                        <div class="empty-icon">
-                            💊
-                        </div>
-
-
-                        {% if search %}
-
-                            <h3>
-                                No medicines found
-                            </h3>
-
-                            <p>
-                                No medicine matches
-                                "{{ search }}".
-                            </p>
-
-                            <a
-                                href="{{ url_for('medicines') }}"
-                                class="btn btn-secondary"
-                            >
-                                Clear Search
-                            </a>
-
-                        {% else %}
-
-                            <h3>
-                                No medicines yet
-                            </h3>
-
-                            <p>
-                                Your medicine inventory is empty.
-                            </p>
-
-                            <a
-                                href="{{ url_for('add_medicine') }}"
-                                class="btn btn-primary"
-                            >
-                                Add Your First Medicine
-                            </a>
+                        </td>
 
                         {% endif %}
 
-                    </td>
+                    </tr>
 
-                </tr>
+                    {% endfor %}
 
-                {% endfor %}
+                </tbody>
 
-            </tbody>
+            </table>
 
-        </table>
+        </div>
 
-    </div>
+    {% else %}
+
+        <div class="empty-state">
+
+            {% if search %}
+
+                <h3>No medicines found</h3>
+
+                <p>
+                    No medicine matches your search.
+                </p>
+
+            {% else %}
+
+                <h3>No medicines available</h3>
+
+                <p>
+                    There are currently no medicines in the system.
+                </p>
+
+            {% endif %}
+
+        </div>
+
+    {% endif %}
 
 </div>
 
 
-<!-- STOCK LEGEND -->
+<div class="legend">
 
-<div class="card inventory-legend">
+    <span>
+        <span class="badge badge-success">Stock</span>
+        Available
+    </span>
 
-    <h3>
-        Stock Status
-    </h3>
+    <span>
+        <span class="badge badge-warning">Low stock</span>
+        10 or fewer
+    </span>
 
-
-    <div class="legend-items">
-
-
-        <div class="legend-item">
-
-            <span class="stock stock-good">
-                25
-            </span>
-
-            <span>
-                Good Stock
-            </span>
-
-        </div>
-
-
-        <div class="legend-item">
-
-            <span class="stock stock-low">
-                8
-            </span>
-
-            <span>
-                Low Stock
-            </span>
-
-        </div>
-
-
-        <div class="legend-item">
-
-            <span class="stock stock-empty">
-                0
-            </span>
-
-            <span>
-                Out of Stock
-            </span>
-
-        </div>
-
-
-    </div>
+    <span>
+        <span class="badge badge-danger">Out of stock</span>
+        0
+    </span>
 
 </div>
 
