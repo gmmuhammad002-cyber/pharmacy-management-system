@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}
+Dashboard - Pharmacy Management System
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+        <h1>Dashboard</h1>
+
+        <p>
+            Welcome back,
+            <strong>{{ current_user.username }}</strong>.
+        </p>
+    </div>
+
+</div>
+
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+
+        <div class="stat-icon">
+            💊
+        </div>
+
+        <div>
+            <h3>Total Medicines</h3>
+            <strong>{{ total_medicines }}</strong>
+        </div>
+
+    </div>
+
+
+    <div class="stat-card warning">
+
+        <div class="stat-icon">
+            ⚠️
+        </div>
+
+        <div>
+            <h3>Low Stock</h3>
+            <strong>{{ low_stock }}</strong>
+        </div>
+
+    </div>
+
+
+    <div class="stat-card success">
+
+        <div class="stat-icon">
+            💰
+        </div>
+
+        <div>
+            <h3>Today's Sales</h3>
+            <strong>${{ "%.2f"|format(today_sales) }}</strong>
+        </div>
+
+    </div>
+
+
+    <div class="stat-card danger">
+
+        <div class="stat-icon">
+            ⏰
+        </div>
+
+        <div>
+            <h3>Expiring Soon</h3>
+            <strong>{{ expiring_soon }}</strong>
+        </div>
+
+    </div>
+
+</div>
+
+
+<div class="dashboard-section">
+
+    <h2>Quick Actions</h2>
+
+    <div class="quick-actions">
+
+        <a
+            href="{{ url_for('medicines') }}"
+            class="action-card"
+        >
+            💊
+            <span>View Medicines</span>
+        </a>
+
+
+        <a
+            href="{{ url_for('add_medicine') }}"
+            class="action-card"
+        >
+            ➕
+            <span>Add Medicine</span>
+        </a>
+
+
+        <a
+            href="{{ url_for('sales') }}"
+            class="action-card"
+        >
+            🛒
+            <span>New Sale</span>
+        </a>
+
+
+        {% if current_user.role == "admin" %}
+
+        <a
+            href="{{ url_for('users') }}"
+            class="action-card"
+        >
+            👥
+            <span>Manage Users</span>
+        </a>
+
+
+        <a
+            href="{{ url_for('logs') }}"
+            class="action-card"
+        >
+            📝
+            <span>Activity Logs</span>
+        </a>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

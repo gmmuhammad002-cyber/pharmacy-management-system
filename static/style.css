@@ -1,0 +1,427 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    color: #222;
+}
+
+
+/* =========================
+   NAVBAR
+========================= */
+
+.navbar {
+    background: #17202a;
+    color: white;
+    min-height: 64px;
+    padding: 12px 25px;
+
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    flex-wrap: wrap;
+}
+
+.nav-brand {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.nav-links {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.nav-links a,
+.nav-user a {
+    color: white;
+    text-decoration: none;
+}
+
+.nav-links a:hover,
+.nav-user a:hover {
+    text-decoration: underline;
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.nav-user small {
+    opacity: 0.7;
+    text-transform: capitalize;
+}
+
+.logout-link {
+    background: #c0392b;
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+
+/* =========================
+   CONTAINER
+========================= */
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+
+/* =========================
+   PAGE HEADER
+========================= */
+
+.page-header {
+    margin-bottom: 25px;
+}
+
+.page-header h1 {
+    margin-bottom: 5px;
+}
+
+.page-header p {
+    color: #666;
+}
+
+
+/* =========================
+   CARDS
+========================= */
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+
+/* =========================
+   DASHBOARD
+========================= */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fit,
+        minmax(220px, 1fr)
+    );
+
+    gap: 20px;
+}
+
+.stat-card {
+    background: white;
+    padding: 25px;
+
+    border-radius: 12px;
+
+    display: flex;
+    align-items: center;
+    gap: 20px;
+
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.stat-icon {
+    font-size: 35px;
+}
+
+.stat-card h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    color: #666;
+}
+
+.stat-card strong {
+    font-size: 25px;
+}
+
+.dashboard-section {
+    margin-top: 35px;
+}
+
+.quick-actions {
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fit, minmax(180px, 1fr));
+
+    gap: 15px;
+}
+
+.action-card {
+    background: white;
+    padding: 25px;
+
+    border-radius: 10px;
+
+    text-decoration: none;
+    color: #222;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    gap: 10px;
+
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    font-size: 17px;
+}
+
+.action-card:hover {
+    transform: translateY(-2px);
+}
+
+
+/* =========================
+   FORMS
+========================= */
+
+.form-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fit, minmax(220px, 1fr));
+
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.form-group label {
+    font-weight: bold;
+}
+
+input,
+select {
+    width: 100%;
+
+    padding: 11px;
+
+    border: 1px solid #ccc;
+    border-radius: 6px;
+
+    font-size: 15px;
+}
+
+input:focus,
+select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+
+/* =========================
+   BUTTONS
+========================= */
+
+.btn {
+    border: none;
+    border-radius: 6px;
+
+    padding: 10px 16px;
+
+    cursor: pointer;
+
+    font-size: 14px;
+}
+
+.btn-primary {
+    background: #2980b9;
+    color: white;
+}
+
+.btn-danger {
+    background: #c0392b;
+    color: white;
+}
+
+.btn-small {
+    padding: 7px 10px;
+    font-size: 13px;
+}
+
+.button-group {
+    justify-content: flex-end;
+}
+
+
+/* =========================
+   TABLE
+========================= */
+
+.table-container {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 13px;
+
+    border-bottom: 1px solid #eee;
+
+    text-align: left;
+}
+
+th {
+    background: #f7f7f7;
+}
+
+
+/* =========================
+   BADGES
+========================= */
+
+.badge {
+    display: inline-block;
+
+    padding: 5px 9px;
+
+    border-radius: 20px;
+
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.badge.admin {
+    background: #8e44ad;
+    color: white;
+}
+
+.badge.staff {
+    background: #3498db;
+    color: white;
+}
+
+.badge.active {
+    background: #27ae60;
+    color: white;
+}
+
+.badge.inactive {
+    background: #7f8c8d;
+    color: white;
+}
+
+
+/* =========================
+   ALERTS
+========================= */
+
+.alert {
+    padding: 12px 15px;
+
+    margin-bottom: 20px;
+
+    border-radius: 7px;
+}
+
+.alert.success {
+    background: #d5f5e3;
+    color: #196f3d;
+}
+
+.alert.danger {
+    background: #fadbd8;
+    color: #922b21;
+}
+
+
+/* =========================
+   LOGIN
+========================= */
+
+.login-container {
+    min-height: 100vh;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    padding: 20px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 430px;
+
+    background: white;
+
+    padding: 35px;
+
+    border-radius: 15px;
+
+    box-shadow:
+        0 8px 30px
+        rgba(0, 0, 0, 0.12);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.login-icon {
+    font-size: 50px;
+}
+
+.login-header h1 {
+    font-size: 23px;
+}
+
+.login-header p {
+    color: #777;
+}
+
+.login-button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 13px;
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 700px) {
+
+    .navbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .nav-links {
+        flex-direction: column;
+    }
+
+    .nav-user {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+}

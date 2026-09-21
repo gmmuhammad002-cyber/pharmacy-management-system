@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}Pharmacy Management System{% endblock %}</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+    {% if current_user.is_authenticated %}
+
+    <nav class="navbar">
+
+        <div class="nav-brand">
+            💊 Pharmacy System
+        </div>
+
+        <div class="nav-links">
+
+            <a href="{{ url_for('index') }}">
+                Dashboard
+            </a>
+
+            <a href="{{ url_for('medicines') }}">
+                Medicines
+            </a>
+
+            <a href="{{ url_for('add_medicine') }}">
+                Add Medicine
+            </a>
+
+            <a href="{{ url_for('sales') }}">
+                Sales
+            </a>
+
+            {% if current_user.role == "admin" %}
+
+                <a href="{{ url_for('users') }}">
+                    Users
+                </a>
+
+                <a href="{{ url_for('logs') }}">
+                    Activity Logs
+                </a>
+
+            {% endif %}
+
+        </div>
+
+        <div class="nav-user">
+
+            <span>
+                👤 {{ current_user.username }}
+                <small>({{ current_user.role }})</small>
+            </span>
+
+            <a
+                href="{{ url_for('logout') }}"
+                class="logout-link"
+            >
+                Logout
+            </a>
+
+        </div>
+
+    </nav>
+
+    {% endif %}
+
+
+    <main class="container">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+
+            {% if messages %}
+
+                {% for category, message in messages %}
+
+                    <div class="alert {{ category }}">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
+
+
+        {% block content %}{% endblock %}
+
+    </main>
+
+</body>
+</html>

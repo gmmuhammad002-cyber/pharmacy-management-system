@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}
+Activity Logs
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+
+        <h1>Activity Logs</h1>
+
+        <p>
+            Recent system activity.
+        </p>
+
+    </div>
+
+</div>
+
+
+<div class="card">
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Date & Time</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for log in logs %}
+
+                <tr>
+
+                    <td>
+                        {{ log.id }}
+                    </td>
+
+                    <td>
+                        {{ log.username }}
+                    </td>
+
+                    <td>
+                        {{ log.action }}
+                    </td>
+
+                    <td>
+                        {{ log.created_at }}
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+
+                    <td colspan="4">
+                        No activity recorded yet.
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}
