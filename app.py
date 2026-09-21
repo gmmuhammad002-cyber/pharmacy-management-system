@@ -42,12 +42,19 @@ database_url = os.environ.get(
     "sqlite:///pharmacy.db"
 )
 
-# Some hosting providers may provide postgres://
-# instead of postgresql://.
+# Convert old postgres:// URLs if necessary.
 if database_url.startswith("postgres://"):
     database_url = database_url.replace(
         "postgres://",
         "postgresql://",
+        1
+    )
+
+# Use psycopg 3 instead of psycopg2.
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace(
+        "postgresql://",
+        "postgresql+psycopg://",
         1
     )
 
@@ -58,7 +65,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-# Enable this when deployed behind HTTPS.
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get(
     "SESSION_COOKIE_SECURE",
     "False"
@@ -288,7 +294,6 @@ def admin_required(function):
 def initialize_database():
     db.create_all()
 
-    # Create default admin only if there are no users.
     if User.query.count() == 0:
 
         admin = User(
@@ -296,8 +301,6 @@ def initialize_database():
             role="admin"
         )
 
-        # Development-only initial password.
-        # Change it immediately after first login.
         admin.set_password(
             os.environ.get(
                 "INITIAL_ADMIN_PASSWORD",
