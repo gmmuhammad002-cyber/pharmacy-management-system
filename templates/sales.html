@@ -8,17 +8,64 @@
 
     <div>
         <h1>Sales</h1>
-        <p>Create a new medicine sale.</p>
+        <p>Search medicines and manage sales.</p>
     </div>
+
+</div>
+
+
+<!-- MEDICINE SEARCH -->
+
+<div class="form-card">
+
+    <h2>Search Medicine</h2>
+
+    <form method="GET" action="{{ url_for('sales') }}">
+
+        <div class="search-box">
+
+            <input
+                type="text"
+                name="search"
+                value="{{ search }}"
+                placeholder="Search medicine by name, barcode or category..."
+            >
+
+            <button
+                type="submit"
+                class="button primary"
+            >
+                🔍 Search
+            </button>
+
+            {% if search %}
+
+            <a
+                href="{{ url_for('sales') }}"
+                class="button"
+            >
+                Clear
+            </a>
+
+            {% endif %}
+
+        </div>
+
+    </form>
 
 </div>
 
 
 <div class="sales-layout">
 
+
+    <!-- NEW SALE -->
+
     <div class="form-card">
 
         <h2>New Sale</h2>
+
+        {% if current_user.is_authenticated %}
 
         <form method="POST">
 
@@ -34,13 +81,13 @@
 
                     {% for medicine in medicines %}
 
-                    <option value="{{ medicine['id'] }}">
+                    <option value="{{ medicine.id }}">
 
-                        {{ medicine['name'] }}
+                        {{ medicine.name }}
                         -
-                        ${{ "%.2f"|format(medicine['selling_price']) }}
+                        ${{ "%.2f"|format(medicine.selling_price|float) }}
                         -
-                        Stock: {{ medicine['quantity'] }}
+                        Stock: {{ medicine.quantity }}
 
                     </option>
 
@@ -75,25 +122,60 @@
 
         </form>
 
+        {% else %}
+
+        <div class="empty-state">
+
+            <div class="empty-icon">🔐</div>
+
+            <h3>Login Required</h3>
+
+            <p>
+                You can search medicines here,
+                but you need to log in to complete a sale.
+            </p>
+
+            <a
+                href="{{ url_for('login') }}"
+                class="button primary"
+            >
+                Admin Login
+            </a>
+
+        </div>
+
+        {% endif %}
+
     </div>
 
 
+    <!-- RECENT SALES -->
+
     <div class="table-container">
 
-        <h2>Recent Sales</h2>
+        <div class="section-header">
+
+            <h2>Recent Sales</h2>
+
+        </div>
+
 
         <table>
 
             <thead>
 
                 <tr>
+
                     <th>Medicine</th>
                     <th>Quantity</th>
                     <th>Total</th>
+                    <th>Sold By</th>
                     <th>Date</th>
+
                 </tr>
 
             </thead>
+
 
             <tbody>
 
@@ -102,19 +184,27 @@
                 <tr>
 
                     <td>
-                        {{ sale["name"] }}
+                        <strong>
+                            {{ sale.medicine.name }}
+                        </strong>
                     </td>
 
                     <td>
-                        {{ sale["quantity"] }}
+                        {{ sale.quantity }}
                     </td>
 
                     <td>
-                        ${{ "%.2f"|format(sale["total_price"]) }}
+                        <strong>
+                            ${{ "%.2f"|format(sale.total_price|float) }}
+                        </strong>
                     </td>
 
                     <td>
-                        {{ sale["sale_date"] }}
+                        {{ sale.seller.username }}
+                    </td>
+
+                    <td>
+                        {{ sale.sale_date.strftime("%Y-%m-%d %H:%M") }}
                     </td>
 
                 </tr>
@@ -124,7 +214,7 @@
                 <tr>
 
                     <td
-                        colspan="4"
+                        colspan="5"
                         class="empty"
                     >
                         No sales yet.
