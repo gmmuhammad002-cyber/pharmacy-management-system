@@ -14,65 +14,90 @@
 
 <body>
 
-    {% if current_user.is_authenticated %}
-
     <nav class="navbar">
 
-        <div class="nav-brand">
-            💊 Pharmacy System
-        </div>
-
-        <div class="nav-links">
-
-            <a href="{{ url_for('index') }}">
-                Dashboard
-            </a>
-
-            <a href="{{ url_for('medicines') }}">
-                Medicines
-            </a>
-
-            <a href="{{ url_for('add_medicine') }}">
-                Add Medicine
-            </a>
-
-            <a href="{{ url_for('sales') }}">
-                Sales
-            </a>
-
-            {% if current_user.role == "admin" %}
-
-                <a href="{{ url_for('users') }}">
-                    Users
-                </a>
-
-                <a href="{{ url_for('logs') }}">
-                    Activity Logs
-                </a>
-
-            {% endif %}
-
-        </div>
-
-        <div class="nav-user">
-
+        <a href="{{ url_for('index') }}" class="nav-brand">
+            <span class="brand-icon">💊</span>
             <span>
-                👤 {{ current_user.username }}
-                <small>({{ current_user.role }})</small>
+                Pharmacy
+                <strong>Care</strong>
             </span>
+        </a>
 
-            <a
-                href="{{ url_for('logout') }}"
-                class="logout-link"
-            >
-                Logout
-            </a>
+        {% if current_user.is_authenticated %}
 
-        </div>
+            <div class="nav-links">
+
+                <a href="{{ url_for('index') }}">
+                    🏠 Dashboard
+                </a>
+
+                <a href="{{ url_for('medicines') }}">
+                    💊 Medicines
+                </a>
+
+                <a href="{{ url_for('add_medicine') }}">
+                    ➕ Add Medicine
+                </a>
+
+                <a href="{{ url_for('sales') }}">
+                    🛒 Sales
+                </a>
+
+                {% if current_user.role == "admin" %}
+
+                    <a href="{{ url_for('users') }}">
+                        👥 Users
+                    </a>
+
+                    <a href="{{ url_for('logs') }}">
+                        📋 Activity Logs
+                    </a>
+
+                {% endif %}
+
+            </div>
+
+            <div class="nav-user">
+
+                <div class="user-info">
+                    <span class="user-avatar">👤</span>
+
+                    <div>
+                        <strong>{{ current_user.username }}</strong>
+                        <small>{{ current_user.role }}</small>
+                    </div>
+                </div>
+
+                <a
+                    href="{{ url_for('logout') }}"
+                    class="logout-link"
+                >
+                    Logout
+                </a>
+
+            </div>
+
+        {% else %}
+
+            <div class="nav-actions">
+
+                <span class="public-label">
+                    Pharmacy Management
+                </span>
+
+                <a
+                    href="{{ url_for('login') }}"
+                    class="login-link"
+                >
+                    🔐 Admin Login
+                </a>
+
+            </div>
+
+        {% endif %}
 
     </nav>
-
-    {% endif %}
 
 
     <main class="container">
@@ -84,6 +109,16 @@
                 {% for category, message in messages %}
 
                     <div class="alert {{ category }}">
+                        <span>
+                            {% if category == "success" %}
+                                ✓
+                            {% elif category == "danger" %}
+                                ⚠
+                            {% else %}
+                                ℹ
+                            {% endif %}
+                        </span>
+
                         {{ message }}
                     </div>
 
