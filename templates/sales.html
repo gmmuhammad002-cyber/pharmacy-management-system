@@ -8,50 +8,8 @@
 
     <div>
         <h1>Sales</h1>
-        <p>Search medicines and manage sales.</p>
+        <p>Create a new medicine sale.</p>
     </div>
-
-</div>
-
-
-<!-- MEDICINE SEARCH -->
-
-<div class="form-card">
-
-    <h2>Search Medicine</h2>
-
-    <form method="GET" action="{{ url_for('sales') }}">
-
-        <div class="search-box">
-
-            <input
-                type="text"
-                name="search"
-                value="{{ search }}"
-                placeholder="Search medicine by name, barcode or category..."
-            >
-
-            <button
-                type="submit"
-                class="button primary"
-            >
-                🔍 Search
-            </button>
-
-            {% if search %}
-
-            <a
-                href="{{ url_for('sales') }}"
-                class="button"
-            >
-                Clear
-            </a>
-
-            {% endif %}
-
-        </div>
-
-    </form>
 
 </div>
 
@@ -73,7 +31,21 @@
 
                 <label>Medicine</label>
 
-                <select name="medicine_id" required>
+                <!-- Medicine Search -->
+
+                <input
+                    type="text"
+                    id="medicineSearch"
+                    placeholder="Search medicine..."
+                    autocomplete="off"
+                    style="margin-bottom: 10px;"
+                >
+
+                <select
+                    name="medicine_id"
+                    id="medicineSelect"
+                    required
+                >
 
                     <option value="">
                         Select a medicine
@@ -81,7 +53,12 @@
 
                     {% for medicine in medicines %}
 
-                    <option value="{{ medicine.id }}">
+                    <option
+                        value="{{ medicine.id }}"
+                        data-name="{{ medicine.name|lower }}"
+                        data-barcode="{{ medicine.barcode|lower }}"
+                        data-category="{{ medicine.category|lower }}"
+                    >
 
                         {{ medicine.name }}
                         -
@@ -94,6 +71,8 @@
                     {% endfor %}
 
                 </select>
+
+                <small id="medicineCount"></small>
 
             </div>
 
@@ -131,8 +110,7 @@
             <h3>Login Required</h3>
 
             <p>
-                You can search medicines here,
-                but you need to log in to complete a sale.
+                You need to log in to complete a sale.
             </p>
 
             <a
@@ -153,29 +131,21 @@
 
     <div class="table-container">
 
-        <div class="section-header">
-
-            <h2>Recent Sales</h2>
-
-        </div>
-
+        <h2>Recent Sales</h2>
 
         <table>
 
             <thead>
 
                 <tr>
-
                     <th>Medicine</th>
                     <th>Quantity</th>
                     <th>Total</th>
                     <th>Sold By</th>
                     <th>Date</th>
-
                 </tr>
 
             </thead>
-
 
             <tbody>
 
@@ -213,10 +183,7 @@
 
                 <tr>
 
-                    <td
-                        colspan="5"
-                        class="empty"
-                    >
+                    <td colspan="5" class="empty">
                         No sales yet.
                     </td>
 
@@ -231,5 +198,88 @@
     </div>
 
 </div>
+
+
+<!-- MEDICINE SEARCH SCRIPT -->
+
+<script>
+
+const searchInput = document.getElementById("medicineSearch");
+const medicineSelect = document.getElementById("medicineSelect");
+const medicineCount = document.getElementById("medicineCount");
+
+if (searchInput) {
+
+    const allOptions = Array.from(
+        medicineSelect.options
+    );
+
+    function filterMedicines() {
+
+        const search = searchInput.value
+            .toLowerCase()
+            .trim();
+
+        medicineSelect.innerHTML = "";
+
+        const firstOption = document.createElement("option");
+
+        firstOption.value = "";
+        firstOption.textContent = "Select a medicine";
+
+        medicineSelect.appendChild(firstOption);
+
+        let count = 0;
+
+        allOptions.forEach(function(option) {
+
+            if (!option.value) {
+                return;
+            }
+
+            const name = option.dataset.name || "";
+            const barcode = option.dataset.barcode || "";
+            const category = option.dataset.category || "";
+
+            if (
+                search === "" ||
+                name.includes(search) ||
+                barcode.includes(search) ||
+                category.includes(search)
+            ) {
+
+                medicineSelect.appendChild(
+                    option.cloneNode(true)
+                );
+
+                count++;
+            }
+
+        });
+
+        if (search === "") {
+
+            medicineCount.textContent =
+                count + " medicines available";
+
+        } else {
+
+            medicineCount.textContent =
+                count + " matching medicines";
+
+        }
+
+    }
+
+    searchInput.addEventListener(
+        "input",
+        filterMedicines
+    );
+
+    filterMedicines();
+
+}
+
+</script>
 
 {% endblock %}
