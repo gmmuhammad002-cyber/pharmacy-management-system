@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, date
+from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -9,7 +9,7 @@ from flask_login import (
     login_user,
     logout_user,
     login_required,
-    current_user,
+    current_user
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -55,7 +55,6 @@ elif database_url.startswith("postgresql+psycopg2://"):
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-
 db = SQLAlchemy(app)
 
 
@@ -75,6 +74,7 @@ login_manager.login_message_category = "warning"
 # =========================================================
 
 class User(UserMixin, db.Model):
+
     __tablename__ = "users"
 
     id = db.Column(
@@ -116,6 +116,7 @@ class User(UserMixin, db.Model):
 
 
 class Medicine(db.Model):
+
     __tablename__ = "medicines"
 
     id = db.Column(
@@ -165,6 +166,7 @@ class Medicine(db.Model):
 
 
 class Sale(db.Model):
+
     __tablename__ = "sales"
 
     id = db.Column(
@@ -202,6 +204,7 @@ class Sale(db.Model):
 
 
 class ActivityLog(db.Model):
+
     __tablename__ = "activity_logs"
 
     id = db.Column(
@@ -300,7 +303,7 @@ def initialize_database():
         username="admin"
     ).first()
 
-    # Create admin if it does not exist
+    # Create admin if it doesn't exist
     if admin is None:
 
         initial_password = os.getenv(
@@ -331,7 +334,7 @@ def initialize_database():
                 "WARNING: INITIAL_ADMIN_PASSWORD is not set."
             )
 
-    # Optional admin password reset
+    # Optional password reset
     reset_password = os.getenv(
         "RESET_ADMIN_PASSWORD",
         ""
@@ -360,33 +363,25 @@ def index():
 
     medicine_count = Medicine.query.count()
 
-    total_stock = (
-        db.session.query(
-            db.func.coalesce(
-                db.func.sum(Medicine.quantity),
-                0
-            )
-        ).scalar()
-    )
+    total_stock = db.session.query(
+        db.func.coalesce(
+            db.func.sum(Medicine.quantity),
+            0
+        )
+    ).scalar()
 
     sales_count = Sale.query.count()
 
     today = datetime.utcnow().date()
 
-    today_sales = (
-        db.session.query(
-            db.func.coalesce(
-                db.func.sum(Sale.total_price),
-                0
-            )
+    today_sales = db.session.query(
+        db.func.coalesce(
+            db.func.sum(Sale.total_price),
+            0
         )
-        .filter(
-            db.func.date(
-                Sale.sale_date
-            ) == today
-        )
-        .scalar()
-    )
+    ).filter(
+        db.func.date(Sale.sale_date) == today
+    ).scalar()
 
     low_stock = Medicine.query.filter(
         Medicine.quantity <= 10
@@ -429,6 +424,7 @@ def index():
 def login():
 
     if current_user.is_authenticated:
+
         return redirect(
             url_for("index")
         )
@@ -992,13 +988,10 @@ def delete_medicine(id):
             url_for("medicines")
         )
 
-    # Do not allow deleting medicine
-    # if it has sales history.
-    existing_sale = Sale.query.filter_by(
+    # Medicine with sales history cannot be deleted.
+    if Sale.query.filter_by(
         medicine_id=medicine.id
-    ).first()
-
-    if existing_sale:
+    ).first():
 
         flash(
             "This medicine cannot be deleted.",
@@ -1062,9 +1055,9 @@ def sales():
         ""
     ).strip()
 
-    # -----------------------------------------------------
+    # =====================================================
     # CREATE SALE
-    # -----------------------------------------------------
+    # =====================================================
 
     if request.method == "POST":
 
@@ -1143,7 +1136,8 @@ def sales():
             )
 
         total_price = (
-            medicine.selling_price * quantity
+            float(medicine.selling_price or 0)
+            * quantity
         )
 
         medicine.quantity -= quantity
@@ -1176,10 +1170,11 @@ def sales():
 
             db.session.rollback()
 
-            print(
-                "CREATE SALE ERROR:",
-                repr(e)
-            )
+            print("================================")
+            print("CREATE SALE ERROR")
+            print("ERROR TYPE:", type(e).__name__)
+            print("ERROR:", str(e))
+            print("================================")
 
             flash(
                 "Could not complete sale.",
@@ -1190,9 +1185,9 @@ def sales():
             url_for("sales")
         )
 
-    # -----------------------------------------------------
+    # =====================================================
     # MEDICINE SEARCH
-    # -----------------------------------------------------
+    # =====================================================
 
     if search:
 
@@ -1227,8 +1222,7 @@ def sales():
             .all()
         )
 
-    # Convert SQLAlchemy objects
-    # into JSON-safe dictionaries.
+    # Convert SQLAlchemy objects to JSON-safe dictionaries
     medicines_json = []
 
     for medicine in medicines_list:
@@ -1246,9 +1240,9 @@ def sales():
             }
         )
 
-    # -----------------------------------------------------
+    # =====================================================
     # RECENT SALES
-    # -----------------------------------------------------
+    # =====================================================
 
     recent_sales = (
         Sale.query
@@ -1299,52 +1293,26 @@ def delete_sale(id):
         sale.medicine_id
     )
 
-    sale_quantity = int(
-        sale.quantity or 0
-    )
-
-    medicine_name = (
-        medicine.name
-        if medicine
-        else "Unknown medicine"
-    )
-
-    # Return the sold quantity to stock.
-    if medicine:
-
-        medicine.quantity = (
-            int(medicine.quantity or 0)
-            + sale_quantity
-        )
-
-    activity_text = (
-        f"Deleted sale record: "
-        f"{sale_quantity} x "
-        f"{medicine_name}"
-    )
-
-    user_id = current_user.id
-
     try:
 
-        # Delete sale first.
+        sale_quantity = int(
+            sale.quantity or 0
+        )
+
+        # Return sold quantity to stock
+        if medicine:
+
+            medicine.quantity = (
+                int(medicine.quantity or 0)
+                + sale_quantity
+            )
+
+        # Delete sale
         db.session.delete(
             sale
         )
 
-        # Make sure the delete is processed
-        # before creating the activity log.
-        db.session.flush()
-
-        # Add activity log in the same transaction.
-        db.session.add(
-            ActivityLog(
-                user_id=user_id,
-                action=activity_text
-            )
-        )
-
-        # Commit everything together.
+        # Commit
         db.session.commit()
 
         flash(
@@ -1357,13 +1325,16 @@ def delete_sale(id):
 
         db.session.rollback()
 
-        print(
-            "DELETE SALE ERROR:",
-            repr(e)
-        )
+        print("================================")
+        print("DELETE SALE ERROR")
+        print("ERROR TYPE:", type(e).__name__)
+        print("ERROR:", str(e))
+        print("================================")
 
         flash(
-            "Could not delete sale record.",
+            f"Delete error: "
+            f"{type(e).__name__}: "
+            f"{str(e)[:300]}",
             "danger"
         )
 
@@ -1575,7 +1546,6 @@ def delete_user(id):
             url_for("users")
         )
 
-    # Prevent deleting yourself.
     if user.id == current_user.id:
 
         flash(
@@ -1587,7 +1557,6 @@ def delete_user(id):
             url_for("users")
         )
 
-    # Prevent deleting admin account.
     if user.username == "admin":
 
         flash(
@@ -1603,7 +1572,6 @@ def delete_user(id):
 
     try:
 
-        # Check if user has sales history.
         user_sales = Sale.query.filter_by(
             sold_by=user.id
         ).first()
@@ -1725,7 +1693,7 @@ with app.app_context():
 
 
 # =========================================================
-# LOCAL DEVELOPMENT
+# START APP
 # =========================================================
 
 if __name__ == "__main__":
