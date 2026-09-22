@@ -5,17 +5,14 @@
 {% block content %}
 
 <div class="page-header">
-
     <div>
         <h1>Sales</h1>
         <p>Create a new medicine sale.</p>
     </div>
-
 </div>
 
 
 <div class="sales-layout">
-
 
     <!-- NEW SALE -->
 
@@ -25,54 +22,33 @@
 
         {% if current_user.is_authenticated %}
 
-        <form method="POST">
+        <form method="POST" id="saleForm">
 
             <div class="form-group">
 
                 <label>Medicine</label>
-
-                <!-- Medicine Search -->
 
                 <input
                     type="text"
                     id="medicineSearch"
                     placeholder="Search medicine..."
                     autocomplete="off"
-                    style="margin-bottom: 10px;"
-                >
-
-                <select
-                    name="medicine_id"
-                    id="medicineSelect"
                     required
                 >
 
-                    <option value="">
-                        Select a medicine
-                    </option>
+                <!-- Seçilen medicine ID'si burada tutulur -->
+                <input
+                    type="hidden"
+                    name="medicine_id"
+                    id="medicineId"
+                    required
+                >
 
-                    {% for medicine in medicines %}
-
-                    <option
-                        value="{{ medicine.id }}"
-                        data-name="{{ medicine.name|lower }}"
-                        data-barcode="{{ medicine.barcode|lower }}"
-                        data-category="{{ medicine.category|lower }}"
-                    >
-
-                        {{ medicine.name }}
-                        -
-                        ${{ "%.2f"|format(medicine.selling_price|float) }}
-                        -
-                        Stock: {{ medicine.quantity }}
-
-                    </option>
-
-                    {% endfor %}
-
-                </select>
-
-                <small id="medicineCount"></small>
+                <!-- Arama sonuçları -->
+                <div
+                    id="medicineResults"
+                    class="medicine-results"
+                ></div>
 
             </div>
 
@@ -136,7 +112,6 @@
         <table>
 
             <thead>
-
                 <tr>
                     <th>Medicine</th>
                     <th>Quantity</th>
@@ -144,7 +119,6 @@
                     <th>Sold By</th>
                     <th>Date</th>
                 </tr>
-
             </thead>
 
             <tbody>
@@ -182,11 +156,9 @@
             {% else %}
 
                 <tr>
-
                     <td colspan="5" class="empty">
                         No sales yet.
                     </td>
-
                 </tr>
 
             {% endfor %}
@@ -200,85 +172,163 @@
 </div>
 
 
-<!-- MEDICINE SEARCH SCRIPT -->
-
 <script>
 
-const searchInput = document.getElementById("medicineSearch");
-const medicineSelect = document.getElementById("medicineSelect");
-const medicineCount = document.getElementById("medicineCount");
+const medicines = [
+    {% for medicine in medicines %}
+    {
+        id: "{{ medicine.id }}",
+        name: {{ medicine.name|tojson }},
+        barcode: {{ medicine.barcode|tojson }},
+        category: {{ medicine.category|tojson }},
+        price: "{{ "%.2f"|format(medicine.selling_price|float) }}",
+        stock: "{{ medicine.quantity }}"
+    },
+    {% endfor %}
+];
 
-if (searchInput) {
 
-    const allOptions = Array.from(
-        medicineSelect.options
-    );
+const searchInput =
+    document.getElementById("medicineSearch");
 
-    function filterMedicines() {
+const medicineId =
+    document.getElementById("medicineId");
 
-        const search = searchInput.value
-            .toLowerCase()
-            .trim();
+const results =
+    document.getElementById("medicineResults");
 
-        medicineSelect.innerHTML = "";
 
-        const firstOption = document.createElement("option");
+searchInput.addEventListener(
+    "input",
+    function () {
 
-        firstOption.value = "";
-        firstOption.textContent = "Select a medicine";
+        const search =
+            this.value.toLowerCase().trim();
 
-        medicineSelect.appendChild(firstOption);
+        medicineId.value = "";
 
-        let count = 0;
+        results.innerHTML = "";
 
-        allOptions.forEach(function(option) {
-
-            if (!option.value) {
-                return;
-            }
-
-            const name = option.dataset.name || "";
-            const barcode = option.dataset.barcode || "";
-            const category = option.dataset.category || "";
-
-            if (
-                search === "" ||
-                name.includes(search) ||
-                barcode.includes(search) ||
-                category.includes(search)
-            ) {
-
-                medicineSelect.appendChild(
-                    option.cloneNode(true)
-                );
-
-                count++;
-            }
-
-        });
-
-        if (search === "") {
-
-            medicineCount.textContent =
-                count + " medicines available";
-
-        } else {
-
-            medicineCount.textContent =
-                count + " matching medicines";
-
+        if (!search) {
+            results.style.display = "none";
+            return;
         }
 
+
+        const matches = medicines.filter(
+            function (medicine) {
+
+                return (
+                    medicine.name
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    medicine.barcode
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    medicine.category
+                        .toLowerCase()
+                        .includes(search)
+                );
+
+            }
+        );
+
+
+        if (matches.length === 0) {
+
+            results.innerHTML =
+                '<div class="medicine-no-results">' +
+                'No medicine found' +
+                '</div>';
+
+            results.style.display = "block";
+
+            return;
+        }
+
+
+        matches.forEach(
+            function (medicine) {
+
+                const item =
+                    document.createElement("div");
+
+                item.className =
+                    "medicine-result";
+
+
+                item.innerHTML = `
+                    <div>
+                        <strong>${medicine.name}</strong>
+                        <small>
+                            ${medicine.category}
+                            • Stock: ${medicine.stock}
+                        </small>
+                    </div>
+
+                    <span>
+                        $${medicine.price}
+                    </span>
+                `;
+
+
+                item.addEventListener(
+                    "click",
+                    function () {
+
+                        searchInput.value =
+                            medicine.name;
+
+                        medicineId.value =
+                            medicine.id;
+
+                        results.innerHTML = "";
+
+                        results.style.display =
+                            "none";
+
+                    }
+                );
+
+
+                results.appendChild(item);
+
+            }
+        );
+
+
+        results.style.display = "block";
+
     }
+);
 
-    searchInput.addEventListener(
-        "input",
-        filterMedicines
+
+document
+    .getElementById("saleForm")
+    .addEventListener(
+        "submit",
+        function (event) {
+
+            if (!medicineId.value) {
+
+                event.preventDefault();
+
+                alert(
+                    "Please search and select a medicine."
+                );
+
+                searchInput.focus();
+
+            }
+
+        }
     );
-
-    filterMedicines();
-
-}
 
 </script>
 
