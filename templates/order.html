@@ -5,11 +5,39 @@
 {% block content %}
 
 <div class="page-header">
+
     <div>
-        <h1>Orders</h1>
-        <p>Place an order without creating an account.</p>
+        <h1>Place an Order</h1>
+
+        <p>
+            You can order medicines without creating an account.
+        </p>
     </div>
+
 </div>
+
+
+{% if success_order %}
+
+<div class="order-success">
+
+    <div class="success-icon">
+        ✓
+    </div>
+
+    <div>
+        <strong>
+            Order #{{ success_order }} received!
+        </strong>
+
+        <p>
+            Your order has been submitted and is waiting for confirmation.
+        </p>
+    </div>
+
+</div>
+
+{% endif %}
 
 
 <!-- =====================================================
@@ -19,23 +47,28 @@
 <div class="order-card">
 
     <div class="order-card-header">
-        <h2>Place an Order</h2>
-        <p>Choose a medicine and enter your contact information.</p>
+
+        <h2>Customer Information</h2>
+
+        <p>
+            Please enter your information for the order.
+        </p>
+
     </div>
 
 
-    <form method="POST"
-          action="{{ url_for('orders') }}"
-          id="orderForm">
-
-        <!-- CUSTOMER INFORMATION -->
+    <form
+        method="POST"
+        action="{{ url_for('orders') }}"
+        id="orderForm"
+    >
 
         <div class="form-grid">
 
             <div class="form-group">
 
                 <label for="customer_name">
-                    Your Name
+                    Full Name
                 </label>
 
                 <input
@@ -71,7 +104,7 @@
         <div class="form-group">
 
             <label for="customer_address">
-                Address
+                Delivery Address
             </label>
 
             <textarea
@@ -96,9 +129,10 @@
             <input
                 type="text"
                 id="medicineSearch"
-                placeholder="Type medicine name, barcode or category..."
+                placeholder="Search by medicine name, barcode or category..."
                 autocomplete="off"
             >
+
 
             <div
                 id="medicineResults"
@@ -136,8 +170,8 @@
                 type="number"
                 id="quantity"
                 name="quantity"
-                min="1"
                 value="1"
+                min="1"
                 required
             >
 
@@ -157,7 +191,7 @@
 
 
 <!-- =====================================================
-     ADMIN ORDER MANAGEMENT
+     ADMIN ORDERS
 ===================================================== -->
 
 {% if current_user.is_authenticated and current_user.role == "admin" %}
@@ -184,14 +218,39 @@
             <thead>
 
                 <tr>
-                    <th>Order</th>
-                    <th>Customer</th>
-                    <th>Medicine</th>
-                    <th>Quantity</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                    <th>Action</th>
+
+                    <th>
+                        Order
+                    </th>
+
+                    <th>
+                        Customer
+                    </th>
+
+                    <th>
+                        Medicine
+                    </th>
+
+                    <th>
+                        Quantity
+                    </th>
+
+                    <th>
+                        Total
+                    </th>
+
+                    <th>
+                        Status
+                    </th>
+
+                    <th>
+                        Date
+                    </th>
+
+                    <th>
+                        Action
+                    </th>
+
                 </tr>
 
             </thead>
@@ -204,9 +263,11 @@
                 <tr>
 
                     <td>
+
                         <strong>
                             #{{ order.id }}
                         </strong>
+
                     </td>
 
 
@@ -250,7 +311,9 @@
 
 
                     <td>
+
                         ${{ "%.2f"|format(order.total_price) }}
+
                     </td>
 
 
@@ -266,7 +329,11 @@
 
 
                     <td>
-                        {{ order.created_at.strftime("%Y-%m-%d %H:%M") }}
+
+                        {{ order.created_at.strftime(
+                            "%Y-%m-%d %H:%M"
+                        ) }}
+
                     </td>
 
 
@@ -274,7 +341,12 @@
 
                         <form
                             method="POST"
-                            action="{{ url_for('update_order_status', id=order.id) }}"
+                            action="{{
+                                url_for(
+                                    'update_order_status',
+                                    id=order.id
+                                )
+                            }}"
                             class="order-status-form"
                         >
 
@@ -285,28 +357,39 @@
 
                                 <option
                                     value="Pending"
-                                    {% if order.status == "Pending" %}selected{% endif %}
+                                    {% if order.status == "Pending" %}
+                                    selected
+                                    {% endif %}
                                 >
                                     Pending
                                 </option>
 
+
                                 <option
                                     value="Approved"
-                                    {% if order.status == "Approved" %}selected{% endif %}
+                                    {% if order.status == "Approved" %}
+                                    selected
+                                    {% endif %}
                                 >
                                     Approved
                                 </option>
 
+
                                 <option
                                     value="Completed"
-                                    {% if order.status == "Completed" %}selected{% endif %}
+                                    {% if order.status == "Completed" %}
+                                    selected
+                                    {% endif %}
                                 >
                                     Completed
                                 </option>
 
+
                                 <option
                                     value="Cancelled"
-                                    {% if order.status == "Cancelled" %}selected{% endif %}
+                                    {% if order.status == "Cancelled" %}
+                                    selected
+                                    {% endif %}
                                 >
                                     Cancelled
                                 </option>
@@ -337,9 +420,11 @@
 
     {% else %}
 
-        <div class="empty-state">
-            No customer orders yet.
-        </div>
+    <div class="empty-state">
+
+        No customer orders yet.
+
+    </div>
 
     {% endif %}
 
@@ -352,40 +437,76 @@
 
 const medicines = [
     {% for medicine in medicines %}
+
     {
         id: {{ medicine.id }},
+
         name: {{ medicine.name|tojson }},
+
         barcode: {{ (medicine.barcode or "")|tojson }},
+
         category: {{ (medicine.category or "")|tojson }},
+
         quantity: {{ medicine.quantity }},
+
         price: {{ medicine.selling_price or 0 }}
     },
+
     {% endfor %}
 ];
 
 
 const searchInput =
-    document.getElementById("medicineSearch");
+    document.getElementById(
+        "medicineSearch"
+    );
+
 
 const results =
-    document.getElementById("medicineResults");
+    document.getElementById(
+        "medicineResults"
+    );
+
 
 const medicineId =
-    document.getElementById("medicineId");
+    document.getElementById(
+        "medicineId"
+    );
+
 
 const selectedMedicine =
-    document.getElementById("selectedMedicine");
+    document.getElementById(
+        "selectedMedicine"
+    );
+
 
 const quantityInput =
-    document.getElementById("quantity");
+    document.getElementById(
+        "quantity"
+    );
+
 
 const orderForm =
-    document.getElementById("orderForm");
+    document.getElementById(
+        "orderForm"
+    );
+
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
 
 
 function showResults(items) {
 
     results.innerHTML = "";
+
 
     if (items.length === 0) {
 
@@ -406,28 +527,51 @@ function showResults(items) {
         const item =
             document.createElement("div");
 
+
         item.className =
             "medicine-result";
 
 
         item.innerHTML = `
+
             <div>
-                <strong>${escapeHtml(medicine.name)}</strong>
+
+                <strong>
+                    ${escapeHtml(medicine.name)}
+                </strong>
 
                 <small>
-                    ${escapeHtml(medicine.category || "Medicine")}
-                    ${medicine.barcode
-                        ? " • " + escapeHtml(medicine.barcode)
-                        : ""}
+
+                    ${escapeHtml(
+                        medicine.category || "Medicine"
+                    )}
+
+                    ${
+                        medicine.barcode
+                        ? " • " +
+                          escapeHtml(
+                              medicine.barcode
+                          )
+                        : ""
+                    }
+
                 </small>
+
             </div>
 
+
             <span>
-                $${Number(medicine.price).toFixed(2)}
+
+                $${Number(
+                    medicine.price
+                ).toFixed(2)}
+
                 <small>
                     Stock: ${medicine.quantity}
                 </small>
+
             </span>
+
         `;
 
 
@@ -438,28 +582,45 @@ function showResults(items) {
                 medicineId.value =
                     medicine.id;
 
+
                 searchInput.value =
                     medicine.name;
 
+
                 selectedMedicine.innerHTML = `
-                    Selected:
+
                     <strong>
-                        ${escapeHtml(medicine.name)}
+                        Selected:
                     </strong>
-                    — $${Number(medicine.price).toFixed(2)}
-                    — Stock: ${medicine.quantity}
+
+                    ${escapeHtml(
+                        medicine.name
+                    )}
+
+                    — $${Number(
+                        medicine.price
+                    ).toFixed(2)}
+
+                    — Stock:
+                    ${medicine.quantity}
+
                 `;
+
 
                 selectedMedicine.style.display =
                     "block";
 
+
                 results.style.display =
                     "none";
+
 
                 quantityInput.max =
                     medicine.quantity;
 
+
                 quantityInput.value = 1;
+
             }
         );
 
@@ -486,6 +647,7 @@ searchInput.addEventListener(
 
         medicineId.value = "";
 
+
         selectedMedicine.style.display =
             "none";
 
@@ -500,30 +662,36 @@ searchInput.addEventListener(
 
 
         const filtered =
-            medicines.filter(function(medicine) {
+            medicines.filter(
+                function(medicine) {
 
-                return (
-                    medicine.name
-                        .toLowerCase()
-                        .includes(search)
+                    return (
 
-                    ||
+                        medicine.name
+                            .toLowerCase()
+                            .includes(search)
 
-                    medicine.barcode
-                        .toLowerCase()
-                        .includes(search)
+                        ||
 
-                    ||
+                        medicine.barcode
+                            .toLowerCase()
+                            .includes(search)
 
-                    medicine.category
-                        .toLowerCase()
-                        .includes(search)
-                );
+                        ||
 
-            });
+                        medicine.category
+                            .toLowerCase()
+                            .includes(search)
+
+                    );
+
+                }
+            );
 
 
-        showResults(filtered);
+        showResults(
+            filtered
+        );
 
     }
 );
@@ -546,7 +714,15 @@ orderForm.addEventListener(
 
 
         const quantity =
-            Number(quantityInput.value);
+            Number(
+                quantityInput.value
+            );
+
+
+        const max =
+            Number(
+                quantityInput.max
+            );
 
 
         if (!quantity || quantity < 1) {
@@ -560,6 +736,17 @@ orderForm.addEventListener(
             return;
         }
 
+
+        if (max && quantity > max) {
+
+            event.preventDefault();
+
+            alert(
+                "The requested quantity is not available."
+            );
+
+        }
+
     }
 );
 
@@ -569,9 +756,15 @@ document.addEventListener(
     function(event) {
 
         if (
-            !searchInput.contains(event.target)
+            !searchInput.contains(
+                event.target
+            )
+
             &&
-            !results.contains(event.target)
+
+            !results.contains(
+                event.target
+            )
         ) {
 
             results.style.display =
@@ -581,16 +774,6 @@ document.addEventListener(
     }
 );
 
-
-function escapeHtml(value) {
-
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
 
 </script>
 
