@@ -1,159 +1,197 @@
 {% extends "base.html" %}
 
-{% block title %}Orders - Pharmacy{% endblock %}
+{% block title %}Orders - Pharmacy Management{% endblock %}
 
 {% block content %}
 
 <div class="page-header">
     <div>
         <h1>Orders</h1>
-
-        {% if is_admin %}
-            <p>Manage customer orders.</p>
-        {% else %}
-            <p>Create and track your orders.</p>
-        {% endif %}
+        <p>Place an order without creating an account.</p>
     </div>
 </div>
 
 
-{% if not is_admin %}
+<!-- =====================================================
+     PUBLIC ORDER FORM
+===================================================== -->
 
-<div class="order-layout">
+<div class="order-card">
 
-    <div class="form-card">
+    <div class="order-card-header">
+        <h2>Place an Order</h2>
+        <p>Choose a medicine and enter your contact information.</p>
+    </div>
 
-        <h2>New Order</h2>
 
-        <p class="form-description">
-            Search for a medicine and choose the quantity.
-        </p>
+    <form method="POST"
+          action="{{ url_for('orders') }}"
+          id="orderForm">
 
-        <form method="POST" id="orderForm">
+        <!-- CUSTOMER INFORMATION -->
+
+        <div class="form-grid">
 
             <div class="form-group">
 
-                <label for="medicineSearch">
-                    Medicine
+                <label for="customer_name">
+                    Your Name
                 </label>
 
                 <input
                     type="text"
-                    id="medicineSearch"
-                    placeholder="Search medicine..."
-                    autocomplete="off"
-                >
-
-                <input
-                    type="hidden"
-                    name="medicine_id"
-                    id="medicineId"
+                    id="customer_name"
+                    name="customer_name"
+                    placeholder="Enter your name"
                     required
                 >
-
-                <div
-                    id="medicineResults"
-                    class="medicine-results"
-                ></div>
-
-                <div
-                    id="selectedMedicine"
-                    class="selected-medicine"
-                    style="display:none;"
-                ></div>
 
             </div>
 
 
             <div class="form-group">
 
-                <label for="quantity">
-                    Quantity
+                <label for="customer_phone">
+                    Phone Number
                 </label>
 
                 <input
-                    type="number"
-                    name="quantity"
-                    id="quantity"
-                    min="1"
-                    value="1"
+                    type="text"
+                    id="customer_phone"
+                    name="customer_phone"
+                    placeholder="Enter your phone number"
                     required
                 >
 
             </div>
 
-
-            <button
-                type="submit"
-                class="button primary full"
-            >
-                Place Order
-            </button>
-
-        </form>
-
-    </div>
-
-</div>
-
-{% endif %}
+        </div>
 
 
-<div class="table-container order-table-container">
+        <div class="form-group">
 
-    <div class="section-header">
+            <label for="customer_address">
+                Address
+            </label>
 
-        <div>
-
-            {% if is_admin %}
-
-                <h2>All Orders</h2>
-
-                <p>
-                    View and manage customer orders.
-                </p>
-
-            {% else %}
-
-                <h2>My Orders</h2>
-
-                <p>
-                    Your previous orders.
-                </p>
-
-            {% endif %}
+            <textarea
+                id="customer_address"
+                name="customer_address"
+                rows="3"
+                placeholder="Enter your delivery address"
+                required
+            ></textarea>
 
         </div>
 
+
+        <!-- MEDICINE SEARCH -->
+
+        <div class="form-group">
+
+            <label for="medicineSearch">
+                Search Medicine
+            </label>
+
+            <input
+                type="text"
+                id="medicineSearch"
+                placeholder="Type medicine name, barcode or category..."
+                autocomplete="off"
+            >
+
+            <div
+                id="medicineResults"
+                class="medicine-results"
+            ></div>
+
+        </div>
+
+
+        <!-- SELECTED MEDICINE -->
+
+        <div
+            id="selectedMedicine"
+            class="selected-medicine"
+            style="display:none;"
+        ></div>
+
+
+        <input
+            type="hidden"
+            name="medicine_id"
+            id="medicineId"
+        >
+
+
+        <!-- QUANTITY -->
+
+        <div class="form-group quantity-group">
+
+            <label for="quantity">
+                Quantity
+            </label>
+
+            <input
+                type="number"
+                id="quantity"
+                name="quantity"
+                min="1"
+                value="1"
+                required
+            >
+
+        </div>
+
+
+        <button
+            type="submit"
+            class="button primary order-button"
+        >
+            Place Order
+        </button>
+
+    </form>
+
+</div>
+
+
+<!-- =====================================================
+     ADMIN ORDER MANAGEMENT
+===================================================== -->
+
+{% if current_user.is_authenticated and current_user.role == "admin" %}
+
+<div class="order-card admin-orders">
+
+    <div class="order-card-header">
+
+        <h2>Customer Orders</h2>
+
+        <p>
+            Manage orders submitted by customers.
+        </p>
+
     </div>
 
 
-    <div class="table-responsive">
+    {% if orders %}
 
-        <table>
+    <div class="table-container">
+
+        <table class="order-table">
 
             <thead>
 
                 <tr>
-
                     <th>Order</th>
-
-                    {% if is_admin %}
-                        <th>Customer</th>
-                    {% endif %}
-
-                    <th>Items</th>
-
+                    <th>Customer</th>
+                    <th>Medicine</th>
+                    <th>Quantity</th>
                     <th>Total</th>
-
                     <th>Status</th>
-
                     <th>Date</th>
-
-                    {% if is_admin %}
-                        <th>Action</th>
-                    {% endif %}
-
+                    <th>Action</th>
                 </tr>
 
             </thead>
@@ -161,7 +199,7 @@
 
             <tbody>
 
-            {% for order in orders %}
+                {% for order in orders %}
 
                 <tr>
 
@@ -172,44 +210,47 @@
                     </td>
 
 
-                    {% if is_admin %}
-
-                        <td>
-                            {{ order.customer.username }}
-                        </td>
-
-                    {% endif %}
-
-
                     <td>
 
-                        <div class="order-items">
+                        <strong>
+                            {{ order.customer_name }}
+                        </strong>
 
-                            {% for item in order.items %}
+                        <small class="customer-info">
+                            {{ order.customer_phone }}
+                        </small>
 
-                                <div class="order-item">
-
-                                    <strong>
-                                        {{ item.medicine.name }}
-                                    </strong>
-
-                                    <span>
-                                        × {{ item.quantity }}
-                                    </span>
-
-                                </div>
-
-                            {% endfor %}
-
-                        </div>
+                        <small class="customer-info">
+                            {{ order.customer_address }}
+                        </small>
 
                     </td>
 
 
                     <td>
-                        <strong>
-                            ${{ "%.2f"|format(order.total_price|float) }}
-                        </strong>
+
+                        {% for item in order.items %}
+
+                            {{ item.medicine.name }}
+
+                        {% endfor %}
+
+                    </td>
+
+
+                    <td>
+
+                        {% for item in order.items %}
+
+                            {{ item.quantity }}
+
+                        {% endfor %}
+
+                    </td>
+
+
+                    <td>
+                        ${{ "%.2f"|format(order.total_price) }}
                     </td>
 
 
@@ -229,81 +270,64 @@
                     </td>
 
 
-                    {% if is_admin %}
+                    <td>
 
-                        <td>
+                        <form
+                            method="POST"
+                            action="{{ url_for('update_order_status', id=order.id) }}"
+                            class="order-status-form"
+                        >
 
-                            <form
-                                method="POST"
-                                action="{{ url_for('update_order_status', id=order.id) }}"
-                                class="order-status-form"
+                            <select
+                                name="status"
+                                class="status-select"
                             >
 
-                                <select
-                                    name="status"
-                                    class="status-select"
+                                <option
+                                    value="Pending"
+                                    {% if order.status == "Pending" %}selected{% endif %}
                                 >
+                                    Pending
+                                </option>
 
-                                    <option
-                                        value="Pending"
-                                        {% if order.status == "Pending" %}selected{% endif %}
-                                    >
-                                        Pending
-                                    </option>
-
-                                    <option
-                                        value="Approved"
-                                        {% if order.status == "Approved" %}selected{% endif %}
-                                    >
-                                        Approved
-                                    </option>
-
-                                    <option
-                                        value="Completed"
-                                        {% if order.status == "Completed" %}selected{% endif %}
-                                    >
-                                        Completed
-                                    </option>
-
-                                    <option
-                                        value="Cancelled"
-                                        {% if order.status == "Cancelled" %}selected{% endif %}
-                                    >
-                                        Cancelled
-                                    </option>
-
-                                </select>
-
-
-                                <button
-                                    type="submit"
-                                    class="button primary small"
+                                <option
+                                    value="Approved"
+                                    {% if order.status == "Approved" %}selected{% endif %}
                                 >
-                                    Update
-                                </button>
+                                    Approved
+                                </option>
 
-                            </form>
+                                <option
+                                    value="Completed"
+                                    {% if order.status == "Completed" %}selected{% endif %}
+                                >
+                                    Completed
+                                </option>
 
-                        </td>
+                                <option
+                                    value="Cancelled"
+                                    {% if order.status == "Cancelled" %}selected{% endif %}
+                                >
+                                    Cancelled
+                                </option>
 
-                    {% endif %}
+                            </select>
 
-                </tr>
 
-            {% else %}
+                            <button
+                                type="submit"
+                                class="button small"
+                            >
+                                Update
+                            </button>
 
-                <tr>
+                        </form>
 
-                    <td
-                        colspan="{% if is_admin %}7{% else %}5{% endif %}"
-                        class="empty"
-                    >
-                        No orders yet.
                     </td>
 
                 </tr>
 
-            {% endfor %}
+                {% endfor %}
 
             </tbody>
 
@@ -311,297 +335,262 @@
 
     </div>
 
+    {% else %}
+
+        <div class="empty-state">
+            No customer orders yet.
+        </div>
+
+    {% endif %}
+
 </div>
+
+{% endif %}
 
 
 <script>
 
-    const medicines = [
-        {% for medicine in medicines %}
-        {
-            id: {{ medicine.id }},
-            name: {{ medicine.name|tojson }},
-            category: {{ (medicine.category or "")|tojson }},
-            barcode: {{ (medicine.barcode or "")|tojson }},
-            quantity: {{ medicine.quantity }},
-            selling_price: {{ medicine.selling_price or 0 }}
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
-    ];
+const medicines = [
+    {% for medicine in medicines %}
+    {
+        id: {{ medicine.id }},
+        name: {{ medicine.name|tojson }},
+        barcode: {{ (medicine.barcode or "")|tojson }},
+        category: {{ (medicine.category or "")|tojson }},
+        quantity: {{ medicine.quantity }},
+        price: {{ medicine.selling_price or 0 }}
+    },
+    {% endfor %}
+];
 
 
-    const searchInput =
-        document.getElementById("medicineSearch");
+const searchInput =
+    document.getElementById("medicineSearch");
 
-    const medicineId =
-        document.getElementById("medicineId");
+const results =
+    document.getElementById("medicineResults");
 
-    const results =
-        document.getElementById("medicineResults");
+const medicineId =
+    document.getElementById("medicineId");
 
-    const selectedMedicine =
-        document.getElementById("selectedMedicine");
+const selectedMedicine =
+    document.getElementById("selectedMedicine");
 
-    const orderForm =
-        document.getElementById("orderForm");
+const quantityInput =
+    document.getElementById("quantity");
 
-
-    if (searchInput) {
-
-        function showResults(items) {
-
-            results.innerHTML = "";
-
-            if (items.length === 0) {
-
-                results.innerHTML =
-                    '<div class="medicine-no-results">' +
-                    'No medicines found.' +
-                    '</div>';
-
-                results.style.display = "block";
-
-                return;
-            }
+const orderForm =
+    document.getElementById("orderForm");
 
 
-            items.forEach(function(medicine) {
+function showResults(items) {
 
-                const item =
-                    document.createElement("div");
+    results.innerHTML = "";
 
-                item.className =
-                    "medicine-result";
+    if (items.length === 0) {
 
+        results.innerHTML = `
+            <div class="medicine-no-results">
+                No medicines found.
+            </div>
+        `;
 
-                item.innerHTML = `
+        results.style.display = "block";
 
-                    <div>
-
-                        <strong>
-                            ${medicine.name}
-                        </strong>
-
-                        <small>
-                            ${medicine.category || "No category"}
-
-                            ${
-                                medicine.barcode
-                                ? " • " + medicine.barcode
-                                : ""
-                            }
-                        </small>
-
-                    </div>
+        return;
+    }
 
 
-                    <span>
+    items.forEach(function(medicine) {
 
-                        $${Number(
-                            medicine.selling_price
-                        ).toFixed(2)}
+        const item =
+            document.createElement("div");
 
-                        <small>
-                            Stock: ${medicine.quantity}
-                        </small>
+        item.className =
+            "medicine-result";
 
-                    </span>
 
+        item.innerHTML = `
+            <div>
+                <strong>${escapeHtml(medicine.name)}</strong>
+
+                <small>
+                    ${escapeHtml(medicine.category || "Medicine")}
+                    ${medicine.barcode
+                        ? " • " + escapeHtml(medicine.barcode)
+                        : ""}
+                </small>
+            </div>
+
+            <span>
+                $${Number(medicine.price).toFixed(2)}
+                <small>
+                    Stock: ${medicine.quantity}
+                </small>
+            </span>
+        `;
+
+
+        item.addEventListener(
+            "click",
+            function() {
+
+                medicineId.value =
+                    medicine.id;
+
+                searchInput.value =
+                    medicine.name;
+
+                selectedMedicine.innerHTML = `
+                    Selected:
+                    <strong>
+                        ${escapeHtml(medicine.name)}
+                    </strong>
+                    — $${Number(medicine.price).toFixed(2)}
+                    — Stock: ${medicine.quantity}
                 `;
 
+                selectedMedicine.style.display =
+                    "block";
 
-                item.addEventListener(
-                    "click",
-                    function() {
+                results.style.display =
+                    "none";
 
-                        medicineId.value =
-                            medicine.id;
+                quantityInput.max =
+                    medicine.quantity;
 
-                        searchInput.value =
-                            medicine.name;
+                quantityInput.value = 1;
+            }
+        );
 
-                        selectedMedicine.innerHTML =
-                            `Selected:
-                            <strong>
-                                ${medicine.name}
-                            </strong>
-                            — Stock:
-                            ${medicine.quantity}`;
 
-                        selectedMedicine.style.display =
-                            "block";
+        results.appendChild(item);
 
-                        results.style.display =
-                            "none";
-                    }
+    });
+
+
+    results.style.display =
+        "block";
+}
+
+
+searchInput.addEventListener(
+    "input",
+    function() {
+
+        const search =
+            this.value
+                .toLowerCase()
+                .trim();
+
+
+        medicineId.value = "";
+
+        selectedMedicine.style.display =
+            "none";
+
+
+        if (!search) {
+
+            results.style.display =
+                "none";
+
+            return;
+        }
+
+
+        const filtered =
+            medicines.filter(function(medicine) {
+
+                return (
+                    medicine.name
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    medicine.barcode
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    medicine.category
+                        .toLowerCase()
+                        .includes(search)
                 );
-
-
-                results.appendChild(item);
 
             });
 
 
-            results.style.display =
-                "block";
+        showResults(filtered);
+
+    }
+);
+
+
+orderForm.addEventListener(
+    "submit",
+    function(event) {
+
+        if (!medicineId.value) {
+
+            event.preventDefault();
+
+            alert(
+                "Please select a medicine from the search results."
+            );
+
+            return;
         }
 
 
-        searchInput.addEventListener(
-            "input",
-            function() {
-
-                const term =
-                    searchInput.value
-                    .trim()
-                    .toLowerCase();
-
-                medicineId.value = "";
-
-                selectedMedicine.style.display =
-                    "none";
+        const quantity =
+            Number(quantityInput.value);
 
 
-                if (!term) {
+        if (!quantity || quantity < 1) {
 
-                    results.style.display =
-                        "none";
+            event.preventDefault();
 
-                    return;
-                }
-
-
-                const matches =
-                    medicines.filter(
-                        function(medicine) {
-
-                            const name =
-                                (
-                                    medicine.name || ""
-                                ).toLowerCase();
-
-                            const barcode =
-                                (
-                                    medicine.barcode || ""
-                                ).toLowerCase();
-
-                            const category =
-                                (
-                                    medicine.category || ""
-                                ).toLowerCase();
-
-
-                            return (
-                                name.includes(term) ||
-                                barcode.includes(term) ||
-                                category.includes(term)
-                            );
-
-                        }
-                    );
-
-
-                showResults(matches);
-
-            }
-        );
-
-
-        orderForm.addEventListener(
-            "submit",
-            function(event) {
-
-                if (!medicineId.value) {
-
-                    event.preventDefault();
-
-                    alert(
-                        "Please search and select a medicine first."
-                    );
-
-                    searchInput.focus();
-                }
-
-            }
-        );
-
-
-        document.addEventListener(
-            "click",
-            function(event) {
-
-                if (
-                    !searchInput.contains(event.target) &&
-                    !results.contains(event.target)
-                ) {
-
-                    results.style.display =
-                        "none";
-                }
-
-            }
-        );
-
-    }
-
-
-    document
-        .querySelectorAll(".order-status-form")
-        .forEach(function(form) {
-
-            form.addEventListener(
-                "submit",
-                function(event) {
-
-                    const select =
-                        form.querySelector(
-                            ".status-select"
-                        );
-
-                    const status =
-                        select.value;
-
-
-                    if (
-                        status === "Approved"
-                    ) {
-
-                        const confirmed =
-                            confirm(
-                                "Approve this order? " +
-                                "The requested quantity will be removed from stock."
-                            );
-
-                        if (!confirmed) {
-
-                            event.preventDefault();
-
-                        }
-
-                    }
-
-
-                    if (
-                        status === "Cancelled"
-                    ) {
-
-                        const confirmed =
-                            confirm(
-                                "Cancel this order?"
-                            );
-
-                        if (!confirmed) {
-
-                            event.preventDefault();
-
-                        }
-
-                    }
-
-                }
+            alert(
+                "Please enter a valid quantity."
             );
 
-        });
+            return;
+        }
+
+    }
+);
+
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        if (
+            !searchInput.contains(event.target)
+            &&
+            !results.contains(event.target)
+        ) {
+
+            results.style.display =
+                "none";
+        }
+
+    }
+);
+
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
 
 </script>
 
