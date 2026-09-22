@@ -11,32 +11,25 @@
     </div>
 </div>
 
-
 <div class="sales-layout">
 
     <!-- NEW SALE -->
-
     <div class="form-card">
 
         <h2>New Sale</h2>
 
-        {% if current_user.is_authenticated %}
-
         <form method="POST" id="saleForm">
 
             <div class="form-group">
-
-                <label>Medicine</label>
+                <label for="medicineSearch">Medicine</label>
 
                 <input
                     type="text"
                     id="medicineSearch"
                     placeholder="Search medicine..."
                     autocomplete="off"
-                    required
                 >
 
-                <!-- Seçilen medicine ID'si burada tutulur -->
                 <input
                     type="hidden"
                     name="medicine_id"
@@ -44,22 +37,29 @@
                     required
                 >
 
-                <!-- Arama sonuçları -->
                 <div
                     id="medicineResults"
                     class="medicine-results"
                 ></div>
 
+                <div
+                    id="selectedMedicine"
+                    class="selected-medicine"
+                    style="display: none;"
+                ></div>
             </div>
 
 
             <div class="form-group">
 
-                <label>Quantity</label>
+                <label for="quantity">
+                    Quantity
+                </label>
 
                 <input
                     type="number"
                     name="quantity"
+                    id="quantity"
                     min="1"
                     value="1"
                     required
@@ -77,95 +77,108 @@
 
         </form>
 
-        {% else %}
-
-        <div class="empty-state">
-
-            <div class="empty-icon">🔐</div>
-
-            <h3>Login Required</h3>
-
-            <p>
-                You need to log in to complete a sale.
-            </p>
-
-            <a
-                href="{{ url_for('login') }}"
-                class="button primary"
-            >
-                Admin Login
-            </a>
-
-        </div>
-
-        {% endif %}
-
     </div>
 
 
     <!-- RECENT SALES -->
-
     <div class="table-container">
 
-        <h2>Recent Sales</h2>
+        <div class="section-header">
+            <div>
+                <h2>Recent Sales</h2>
+                <p>Latest sales records.</p>
+            </div>
+        </div>
 
-        <table>
 
-            <thead>
-                <tr>
-                    <th>Medicine</th>
-                    <th>Quantity</th>
-                    <th>Total</th>
-                    <th>Sold By</th>
-                    <th>Date</th>
-                </tr>
-            </thead>
+        <div class="table-responsive">
 
-            <tbody>
+            <table>
 
-            {% for sale in recent_sales %}
+                <thead>
+                    <tr>
+                        <th>Medicine</th>
+                        <th>Quantity</th>
+                        <th>Total</th>
+                        <th>Sold By</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
 
-                <tr>
 
-                    <td>
-                        <strong>
-                            {{ sale.medicine.name }}
-                        </strong>
-                    </td>
+                <tbody>
 
-                    <td>
-                        {{ sale.quantity }}
-                    </td>
+                {% for sale in recent_sales %}
 
-                    <td>
-                        <strong>
+                    <tr>
+
+                        <td>
+                            <strong>
+                                {{ sale.medicine.name }}
+                            </strong>
+                        </td>
+
+
+                        <td>
+                            {{ sale.quantity }}
+                        </td>
+
+
+                        <td>
                             ${{ "%.2f"|format(sale.total_price|float) }}
-                        </strong>
-                    </td>
+                        </td>
 
-                    <td>
-                        {{ sale.seller.username }}
-                    </td>
 
-                    <td>
-                        {{ sale.sale_date.strftime("%Y-%m-%d %H:%M") }}
-                    </td>
+                        <td>
+                            {{ sale.seller.username }}
+                        </td>
 
-                </tr>
 
-            {% else %}
+                        <td>
+                            {{ sale.sale_date.strftime("%Y-%m-%d %H:%M") }}
+                        </td>
 
-                <tr>
-                    <td colspan="5" class="empty">
-                        No sales yet.
-                    </td>
-                </tr>
 
-            {% endfor %}
+                        <td>
 
-            </tbody>
+                            <form
+                                method="POST"
+                                action="{{ url_for('delete_sale', id=sale.id) }}"
+                                onsubmit="return confirm('Delete this sale record? The quantity will be returned to stock.');"
+                            >
 
-        </table>
+                                <button
+                                    type="submit"
+                                    class="button danger"
+                                >
+                                    Delete
+                                </button>
+
+                            </form>
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+                        <td
+                            colspan="6"
+                            class="empty"
+                        >
+                            No sales yet.
+                        </td>
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
 
     </div>
 
@@ -174,78 +187,35 @@
 
 <script>
 
-const medicines = [
-    {% for medicine in medicines %}
-    {
-        id: "{{ medicine.id }}",
-        name: {{ medicine.name|tojson }},
-        barcode: {{ medicine.barcode|tojson }},
-        category: {{ medicine.category|tojson }},
-        price: "{{ "%.2f"|format(medicine.selling_price|float) }}",
-        stock: "{{ medicine.quantity }}"
-    },
-    {% endfor %}
-];
+    const medicines = {{ medicines|tojson }};
+
+    const searchInput =
+        document.getElementById("medicineSearch");
+
+    const medicineId =
+        document.getElementById("medicineId");
+
+    const results =
+        document.getElementById("medicineResults");
+
+    const selectedMedicine =
+        document.getElementById("selectedMedicine");
+
+    const saleForm =
+        document.getElementById("saleForm");
 
 
-const searchInput =
-    document.getElementById("medicineSearch");
-
-const medicineId =
-    document.getElementById("medicineId");
-
-const results =
-    document.getElementById("medicineResults");
-
-
-searchInput.addEventListener(
-    "input",
-    function () {
-
-        const search =
-            this.value.toLowerCase().trim();
-
-        medicineId.value = "";
+    function showResults(items) {
 
         results.innerHTML = "";
 
-        if (!search) {
-            results.style.display = "none";
-            return;
-        }
+        if (items.length === 0) {
 
-
-        const matches = medicines.filter(
-            function (medicine) {
-
-                return (
-                    medicine.name
-                        .toLowerCase()
-                        .includes(search)
-
-                    ||
-
-                    medicine.barcode
-                        .toLowerCase()
-                        .includes(search)
-
-                    ||
-
-                    medicine.category
-                        .toLowerCase()
-                        .includes(search)
-                );
-
-            }
-        );
-
-
-        if (matches.length === 0) {
-
-            results.innerHTML =
-                '<div class="medicine-no-results">' +
-                'No medicine found' +
-                '</div>';
+            results.innerHTML = `
+                <div class="medicine-no-results">
+                    No medicines found.
+                </div>
+            `;
 
             results.style.display = "block";
 
@@ -253,65 +223,125 @@ searchInput.addEventListener(
         }
 
 
-        matches.forEach(
-            function (medicine) {
+        items.forEach(function (medicine) {
 
-                const item =
-                    document.createElement("div");
+            const item =
+                document.createElement("div");
 
-                item.className =
-                    "medicine-result";
+            item.className =
+                "medicine-result";
 
 
-                item.innerHTML = `
-                    <div>
+            item.innerHTML = `
+                <div>
+                    <strong>${medicine.name}</strong>
+                    <small>
+                        ${medicine.category || "No category"}
+                        ${medicine.barcode ? " • " + medicine.barcode : ""}
+                    </small>
+                </div>
+
+                <span>
+                    $${Number(medicine.selling_price).toFixed(2)}
+                    <small>
+                        Stock: ${medicine.quantity}
+                    </small>
+                </span>
+            `;
+
+
+            item.addEventListener(
+                "click",
+                function () {
+
+                    medicineId.value =
+                        medicine.id;
+
+                    searchInput.value =
+                        medicine.name;
+
+                    selectedMedicine.innerHTML = `
+                        Selected:
                         <strong>${medicine.name}</strong>
-                        <small>
-                            ${medicine.category}
-                            • Stock: ${medicine.stock}
-                        </small>
-                    </div>
+                        — Stock: ${medicine.quantity}
+                    `;
 
-                    <span>
-                        $${medicine.price}
-                    </span>
-                `;
+                    selectedMedicine.style.display =
+                        "block";
 
-
-                item.addEventListener(
-                    "click",
-                    function () {
-
-                        searchInput.value =
-                            medicine.name;
-
-                        medicineId.value =
-                            medicine.id;
-
-                        results.innerHTML = "";
-
-                        results.style.display =
-                            "none";
-
-                    }
-                );
+                    results.style.display =
+                        "none";
+                }
+            );
 
 
-                results.appendChild(item);
+            results.appendChild(item);
 
-            }
-        );
+        });
 
 
         results.style.display = "block";
-
     }
-);
 
 
-document
-    .getElementById("saleForm")
-    .addEventListener(
+    searchInput.addEventListener(
+        "input",
+        function () {
+
+            const term =
+                searchInput.value
+                    .trim()
+                    .toLowerCase();
+
+
+            // Clear previously selected medicine
+            medicineId.value = "";
+
+            selectedMedicine.style.display =
+                "none";
+
+
+            if (!term) {
+
+                results.style.display =
+                    "none";
+
+                return;
+            }
+
+
+            const matches =
+                medicines.filter(function (medicine) {
+
+                    const name =
+                        (medicine.name || "")
+                            .toLowerCase();
+
+                    const barcode =
+                        (medicine.barcode || "")
+                            .toLowerCase();
+
+                    const category =
+                        (medicine.category || "")
+                            .toLowerCase();
+
+
+                    return (
+                        name.includes(term) ||
+                        barcode.includes(term) ||
+                        category.includes(term)
+                    );
+
+                });
+
+
+            showResults(matches);
+
+        }
+    );
+
+
+    saleForm.addEventListener(
         "submit",
         function (event) {
 
@@ -320,10 +350,28 @@ document
                 event.preventDefault();
 
                 alert(
-                    "Please search and select a medicine."
+                    "Please search and select a medicine first."
                 );
 
                 searchInput.focus();
+
+            }
+
+        }
+    );
+
+
+    document.addEventListener(
+        "click",
+        function (event) {
+
+            if (
+                !searchInput.contains(event.target) &&
+                !results.contains(event.target)
+            ) {
+
+                results.style.display =
+                    "none";
 
             }
 
