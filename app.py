@@ -1,10 +1,8 @@
 import os
 from datetime import datetime
-from functools import wraps
-from decimal import Decimal
 
-from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -13,199 +11,76 @@ from flask_login import (
     login_required,
     current_user,
 )
-from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-
-load_dotenv()
-
-
-# =========================
-# CONFIG
-# =========================
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-
-if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY environment variable is missing.")
-
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    DATABASE_URL = "sqlite:///pharmacy.db"
-
-
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgres://",
-        "postgresql+psycopg://",
-        1
-    )
-
-elif DATABASE_URL.startswith("postgresql+psycopg2://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgresql+psycopg2://",
-        "postgresql+psycopg://",
-        1
-    )
-
-elif DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgresql://",
-        "postgresql+psycopg://",
-        1
-    )
 
 
 app = Flask(__name__)
 
-app.config["SECRET_KEY"] = SECRET_KEY
-app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
+
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "change-this-secret-key")
+
+database_url = os.getenv("DATABASE_URL", "sqlite:///pharmacy.db")
+
+# Render/PostgreSQL compatibility
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace(
+        "postgres://", "postgresql+psycopg://", 1
+    )
+elif database_url.startswith("postgresql://"):
+    database_url = database_url.replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
+elif database_url.startswith("postgresql+psycopg2://"):
+    database_url = database_url.replace(
+        "postgresql+psycopg2://", "postgresql+psycopg://", 1
+    )
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True
-}
-
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-
-app.config["SESSION_COOKIE_SECURE"] = (
-    os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
-)
-
 
 db = SQLAlchemy(app)
 
-
-# =========================
-# LOGIN
-# =========================
-
-login_manager = LoginManager()
-
-login_manager.init_app(app)
-
+login_manager = LoginManager(app)
 login_manager.login_view = "login"
-
-login_manager.login_message = "Please log in to access this page."
-
+login_manager.login_message = "Please log in first."
 login_manager.login_message_category = "warning"
 
 
-# =========================
+# --------------------------------------------------
 # MODELS
-# =========================
+# --------------------------------------------------
 
 class User(UserMixin, db.Model):
-
     __tablename__ = "users"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), default="staff", nullable=False)
 
-    username = db.Column(
-        db.String(80),
-        unique=True,
-        nullable=False
-    )
-
-    password_hash = db.Column(
-        db.String(255),
-        nullable=False
-    )
-
-    role = db.Column(
-        db.String(20),
-        nullable=False,
-        default="staff"
-    )
-
-    is_active_user = db.Column(
-        db.Boolean,
-        nullable=False,
-        default=True
-    )
-
-    created_at = db.Column(
-        db.DateTime,
-        default=datetime.utcnow
-    )
-
-    sales = db.relationship(
-        "Sale",
-        backref="seller",
-        lazy=True
-    )
+    sales = db.relationship("Sale", backref="seller", lazy=True)
 
     def set_password(self, password):
-
-        self.password_hash = generate_password_hash(
-            password
-        )
+        self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-
-        return check_password_hash(
-            self.password_hash,
-            password
-        )
-
-    @property
-    def is_active(self):
-
-        return self.is_active_user
+        return check_password_hash(self.password_hash, password)
 
 
 class Medicine(db.Model):
-
     __tablename__ = "medicines"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
-
-    name = db.Column(
-        db.String(150),
-        nullable=False
-    )
-
-    barcode = db.Column(
-        db.String(100),
-        unique=True,
-        nullable=False
-    )
-
-    category = db.Column(
-        db.String(100),
-        nullable=False
-    )
-
-    quantity = db.Column(
-        db.Integer,
-        nullable=False,
-        default=0
-    )
-
-    purchase_price = db.Column(
-        db.Numeric(10, 2),
-        nullable=False,
-        default=0
-    )
-
-    selling_price = db.Column(
-        db.Numeric(10, 2),
-        nullable=False,
-        default=0
-    )
-
-    expiry_date = db.Column(
-        db.Date,
-        nullable=True
-    )
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    category = db.Column(db.String(100))
+    barcode = db.Column(db.String(100), unique=True)
+    quantity = db.Column(db.Integer, default=0, nullable=False)
+    purchase_price = db.Column(db.Float, default=0)
+    selling_price = db.Column(db.Float, default=0)
+    expiry_date = db.Column(db.Date)
 
     sales = db.relationship(
         "Sale",
@@ -215,35 +90,21 @@ class Medicine(db.Model):
 
 
 class Sale(db.Model):
-
     __tablename__ = "sales"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
-
+    id = db.Column(db.Integer, primary_key=True)
     medicine_id = db.Column(
         db.Integer,
         db.ForeignKey("medicines.id"),
         nullable=False
     )
-
-    quantity = db.Column(
-        db.Integer,
-        nullable=False
-    )
-
-    total_price = db.Column(
-        db.Numeric(10, 2),
-        nullable=False
-    )
-
+    quantity = db.Column(db.Integer, nullable=False)
+    total_price = db.Column(db.Float, nullable=False)
     sale_date = db.Column(
         db.DateTime,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        nullable=False
     )
-
     sold_by = db.Column(
         db.Integer,
         db.ForeignKey("users.id"),
@@ -252,129 +113,119 @@ class Sale(db.Model):
 
 
 class ActivityLog(db.Model):
-
     __tablename__ = "activity_logs"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
-
-    username = db.Column(
-        db.String(80),
-        nullable=False
-    )
-
-    action = db.Column(
-        db.String(255),
-        nullable=False
-    )
-
-    created_at = db.Column(
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    action = db.Column(db.String(255), nullable=False)
+    timestamp = db.Column(
         db.DateTime,
-        default=datetime.utcnow
+        default=datetime.utcnow,
+        nullable=False
     )
 
+    user = db.relationship("User", backref="activity_logs")
 
-# =========================
-# LOGIN MANAGER
-# =========================
+
+# --------------------------------------------------
+# LOGIN
+# --------------------------------------------------
 
 @login_manager.user_loader
 def load_user(user_id):
-
-    try:
-
-        return db.session.get(
-            User,
-            int(user_id)
-        )
-
-    except (TypeError, ValueError):
-
-        return None
+    return db.session.get(User, int(user_id))
 
 
-# =========================
-# ACTIVITY LOG
-# =========================
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
 
 def log_activity(action):
-
-    if not current_user.is_authenticated:
-        return
-
-    try:
-
+    if current_user.is_authenticated:
         log = ActivityLog(
-            username=current_user.username,
+            user_id=current_user.id,
             action=action
         )
-
         db.session.add(log)
-
         db.session.commit()
 
-    except Exception:
 
-        db.session.rollback()
+def admin_required():
+    return current_user.is_authenticated and current_user.role == "admin"
 
 
-# =========================
-# ADMIN REQUIRED
-# =========================
+# --------------------------------------------------
+# DATABASE INITIALIZATION
+# --------------------------------------------------
 
-def admin_required(function):
+def initialize_database():
+    db.create_all()
 
-    @wraps(function)
-    @login_required
-    def decorated_function(*args, **kwargs):
+    admin = User.query.filter_by(username="admin").first()
 
-        if current_user.role != "admin":
+    if admin is None:
+        initial_password = os.getenv("INITIAL_ADMIN_PASSWORD")
 
-            flash(
-                "Administrator access required.",
-                "danger"
+        if not initial_password:
+            print(
+                "WARNING: INITIAL_ADMIN_PASSWORD is not set. "
+                "Admin user was not created."
             )
-
-            return redirect(
-                url_for("index")
+        else:
+            admin = User(
+                username="admin",
+                role="admin"
             )
+            admin.set_password(initial_password)
 
-        return function(*args, **kwargs)
+            db.session.add(admin)
+            db.session.commit()
 
-    return decorated_function
+            print("ADMIN USER CREATED")
+
+    # Optional password reset
+    reset_password = os.getenv("RESET_ADMIN_PASSWORD", "").strip()
+
+    if reset_password and admin:
+        admin.set_password(reset_password)
+        db.session.commit()
+        print("ADMIN PASSWORD RESET SUCCESS")
 
 
-# =========================
+# --------------------------------------------------
 # DASHBOARD
-# =========================
+# --------------------------------------------------
 
 @app.route("/")
 @login_required
 def index():
-
     medicine_count = Medicine.query.count()
 
-    total_stock = db.session.query(
-        db.func.coalesce(
-            db.func.sum(Medicine.quantity),
-            0
-        )
-    ).scalar()
+    total_stock = (
+        db.session.query(
+            db.func.coalesce(
+                db.func.sum(Medicine.quantity),
+                0
+            )
+        ).scalar()
+    )
 
     sales_count = Sale.query.count()
 
     today = datetime.utcnow().date()
 
-    today_sales = db.session.query(
-        db.func.coalesce(
-            db.func.sum(Sale.total_price),
-            0
+    today_sales = (
+        db.session.query(
+            db.func.coalesce(
+                db.func.sum(Sale.total_price),
+                0
+            )
         )
-    ).filter(
-        db.func.date(Sale.sale_date) == today
-    ).scalar()
+        .filter(
+            db.func.date(Sale.sale_date) == today
+        )
+        .scalar()
+    )
 
     low_stock = Medicine.query.filter(
         Medicine.quantity <= 10
@@ -385,9 +236,12 @@ def index():
         Medicine.expiry_date <= today
     ).count()
 
-    recent_sales = Sale.query.order_by(
-        Sale.sale_date.desc()
-    ).limit(5).all()
+    recent_sales = (
+        Sale.query
+        .order_by(Sale.sale_date.desc())
+        .limit(5)
+        .all()
+    )
 
     return render_template(
         "index.html",
@@ -401,123 +255,84 @@ def index():
     )
 
 
-# =========================
+# --------------------------------------------------
 # LOGIN
-# =========================
+# --------------------------------------------------
 
-@app.route(
-    "/login",
-    methods=["GET", "POST"]
-)
+@app.route("/login", methods=["GET", "POST"])
 def login():
-
     if current_user.is_authenticated:
-
-        return redirect(
-            url_for("index")
-        )
+        return redirect(url_for("index"))
 
     if request.method == "POST":
-
-        username = request.form.get(
-            "username",
-            ""
-        ).strip()
-
-        password = request.form.get(
-            "password",
-            ""
-        )
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
 
         user = User.query.filter_by(
             username=username
         ).first()
 
         if user and user.check_password(password):
-
-            if not user.is_active_user:
-
-                flash(
-                    "This account is disabled.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("login")
-                )
-
             login_user(user)
 
             log_activity("Logged in")
 
-            return redirect(
-                url_for("index")
+            flash(
+                "Login successful.",
+                "success"
             )
+
+            return redirect(url_for("index"))
 
         flash(
             "Invalid username or password.",
             "danger"
         )
 
-    return render_template(
-        "login.html"
-    )
+    return render_template("login.html")
 
-
-# =========================
-# LOGOUT
-# =========================
 
 @app.route("/logout")
 @login_required
 def logout():
-
     log_activity("Logged out")
-
     logout_user()
 
-    return redirect(
-        url_for("medicines")
+    flash(
+        "You have been logged out.",
+        "success"
     )
 
+    return redirect(url_for("login"))
 
-# =========================
+
+# --------------------------------------------------
 # MEDICINES
-# =========================
+# --------------------------------------------------
 
 @app.route("/medicines")
 def medicines():
-
     search = request.args.get(
         "search",
         ""
     ).strip()
 
+    query = Medicine.query
+
     if search:
-
-        medicines_list = Medicine.query.filter(
+        query = query.filter(
             db.or_(
-                Medicine.name.ilike(
-                    f"%{search}%"
-                ),
-
-                Medicine.barcode.ilike(
-                    f"%{search}%"
-                ),
-
-                Medicine.category.ilike(
-                    f"%{search}%"
-                )
+                Medicine.name.ilike(f"%{search}%"),
+                Medicine.barcode.ilike(f"%{search}%"),
+                Medicine.category.ilike(f"%{search}%")
             )
-        ).order_by(
-            Medicine.name
-        ).all()
+        )
 
-    else:
-
-        medicines_list = Medicine.query.order_by(
-            Medicine.name
-        ).all()
+    medicines_list = (
+        query
+        .order_by(Medicine.name)
+        .all()
+    )
 
     return render_template(
         "medicines.html",
@@ -526,26 +341,16 @@ def medicines():
     )
 
 
-# =========================
+# --------------------------------------------------
 # ADD MEDICINE
-# =========================
+# --------------------------------------------------
 
-@app.route(
-    "/medicines/add",
-    methods=["GET", "POST"]
-)
+@app.route("/medicines/add", methods=["GET", "POST"])
 @login_required
 def add_medicine():
-
     if request.method == "POST":
-
         name = request.form.get(
             "name",
-            ""
-        ).strip()
-
-        barcode = request.form.get(
-            "barcode",
             ""
         ).strip()
 
@@ -554,119 +359,98 @@ def add_medicine():
             ""
         ).strip()
 
-        try:
+        barcode = request.form.get(
+            "barcode",
+            ""
+        ).strip()
 
+        try:
             quantity = int(
                 request.form.get(
                     "quantity",
-                    "0"
+                    0
                 )
             )
 
-            purchase_price = Decimal(
+            purchase_price = float(
                 request.form.get(
                     "purchase_price",
-                    "0"
+                    0
                 )
             )
 
-            selling_price = Decimal(
+            selling_price = float(
                 request.form.get(
                     "selling_price",
-                    "0"
+                    0
                 )
             )
 
-        except Exception:
-
+        except (TypeError, ValueError):
             flash(
-                "Invalid quantity or price.",
+                "Invalid medicine information.",
                 "danger"
             )
+            return redirect(url_for("add_medicine"))
 
-            return redirect(
-                url_for("add_medicine")
-            )
+        expiry_date = None
 
-        expiry_date_text = request.form.get(
+        expiry_value = request.form.get(
             "expiry_date",
             ""
-        )
+        ).strip()
 
-        if not name or not barcode or not category:
+        if expiry_value:
+            try:
+                expiry_date = datetime.strptime(
+                    expiry_value,
+                    "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                flash(
+                    "Invalid expiry date.",
+                    "danger"
+                )
+                return redirect(
+                    url_for("add_medicine")
+                )
 
+        if not name:
             flash(
-                "Please fill in all required fields.",
+                "Medicine name is required.",
                 "danger"
             )
-
             return redirect(
                 url_for("add_medicine")
             )
 
         if quantity < 0:
-
             flash(
                 "Quantity cannot be negative.",
                 "danger"
             )
-
             return redirect(
                 url_for("add_medicine")
             )
 
-        if purchase_price < 0 or selling_price < 0:
+        if barcode:
+            existing = Medicine.query.filter_by(
+                barcode=barcode
+            ).first()
 
-            flash(
-                "Prices cannot be negative.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("add_medicine")
-            )
-
-        existing = Medicine.query.filter_by(
-            barcode=barcode
-        ).first()
-
-        if existing:
-
-            flash(
-                "A medicine with this barcode already exists.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("add_medicine")
-            )
-
-        expiry_date = None
-
-        if expiry_date_text:
-
-            try:
-
-                expiry_date = datetime.strptime(
-                    expiry_date_text,
-                    "%Y-%m-%d"
-                ).date()
-
-            except ValueError:
-
+            if existing:
                 flash(
-                    "Invalid expiry date.",
+                    "A medicine with this barcode already exists.",
                     "danger"
                 )
-
                 return redirect(
                     url_for("add_medicine")
                 )
 
         medicine = Medicine(
             name=name,
-            barcode=barcode,
             category=category,
+            barcode=barcode or None,
             quantity=quantity,
             purchase_price=purchase_price,
             selling_price=selling_price,
@@ -674,11 +458,10 @@ def add_medicine():
         )
 
         db.session.add(medicine)
-
         db.session.commit()
 
         log_activity(
-            f"Added medicine: {name}"
+            f"Added medicine: {medicine.name}"
         )
 
         flash(
@@ -695,69 +478,70 @@ def add_medicine():
     )
 
 
-# =========================
+# --------------------------------------------------
 # EDIT MEDICINE
-# =========================
+# --------------------------------------------------
 
-@app.route(
-    "/medicines/edit/<int:id>",
-    methods=["GET", "POST"]
-)
+@app.route("/medicines/edit/<int:id>", methods=["GET", "POST"])
 @login_required
 def edit_medicine(id):
-
-    medicine = db.get_or_404(
+    medicine = db.session.get(
         Medicine,
         id
     )
 
-    if request.method == "POST":
+    if not medicine:
+        flash(
+            "Medicine not found.",
+            "danger"
+        )
+        return redirect(
+            url_for("medicines")
+        )
 
-        name = request.form.get(
+    if request.method == "POST":
+        medicine.name = request.form.get(
             "name",
             ""
         ).strip()
 
-        barcode = request.form.get(
-            "barcode",
-            ""
-        ).strip()
-
-        category = request.form.get(
+        medicine.category = request.form.get(
             "category",
             ""
         ).strip()
 
-        try:
+        medicine.barcode = request.form.get(
+            "barcode",
+            ""
+        ).strip() or None
 
-            quantity = int(
+        try:
+            medicine.quantity = int(
                 request.form.get(
                     "quantity",
-                    "0"
+                    0
                 )
             )
 
-            purchase_price = Decimal(
+            medicine.purchase_price = float(
                 request.form.get(
                     "purchase_price",
-                    "0"
+                    0
                 )
             )
 
-            selling_price = Decimal(
+            medicine.selling_price = float(
                 request.form.get(
                     "selling_price",
-                    "0"
+                    0
                 )
             )
 
-        except Exception:
-
+        except (TypeError, ValueError):
             flash(
-                "Invalid quantity or price.",
+                "Invalid medicine information.",
                 "danger"
             )
-
             return redirect(
                 url_for(
                     "edit_medicine",
@@ -765,109 +549,50 @@ def edit_medicine(id):
                 )
             )
 
-        expiry_date_text = request.form.get(
+        expiry_value = request.form.get(
             "expiry_date",
             ""
-        )
+        ).strip()
 
-        if not name or not barcode or not category:
-
-            flash(
-                "Please fill in all required fields.",
-                "danger"
-            )
-
-            return redirect(
-                url_for(
-                    "edit_medicine",
-                    id=id
-                )
-            )
-
-        if quantity < 0:
-
-            flash(
-                "Quantity cannot be negative.",
-                "danger"
-            )
-
-            return redirect(
-                url_for(
-                    "edit_medicine",
-                    id=id
-                )
-            )
-
-        if purchase_price < 0 or selling_price < 0:
-
-            flash(
-                "Prices cannot be negative.",
-                "danger"
-            )
-
-            return redirect(
-                url_for(
-                    "edit_medicine",
-                    id=id
-                )
-            )
-
-        duplicate = Medicine.query.filter(
-            Medicine.barcode == barcode,
-            Medicine.id != id
-        ).first()
-
-        if duplicate:
-
-            flash(
-                "Another medicine already uses this barcode.",
-                "danger"
-            )
-
-            return redirect(
-                url_for(
-                    "edit_medicine",
-                    id=id
-                )
-            )
-
-        expiry_date = None
-
-        if expiry_date_text:
-
+        if expiry_value:
             try:
-
-                expiry_date = datetime.strptime(
-                    expiry_date_text,
+                medicine.expiry_date = datetime.strptime(
+                    expiry_value,
                     "%Y-%m-%d"
                 ).date()
-
             except ValueError:
-
                 flash(
                     "Invalid expiry date.",
                     "danger"
                 )
-
                 return redirect(
                     url_for(
                         "edit_medicine",
                         id=id
                     )
                 )
+        else:
+            medicine.expiry_date = None
 
-        medicine.name = name
-        medicine.barcode = barcode
-        medicine.category = category
-        medicine.quantity = quantity
-        medicine.purchase_price = purchase_price
-        medicine.selling_price = selling_price
-        medicine.expiry_date = expiry_date
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
-        db.session.commit()
+            flash(
+                "Could not update medicine.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "edit_medicine",
+                    id=id
+                )
+            )
 
         log_activity(
-            f"Edited medicine: {name}"
+            f"Edited medicine: {medicine.name}"
         )
 
         flash(
@@ -885,87 +610,85 @@ def edit_medicine(id):
     )
 
 
-# =========================
+# --------------------------------------------------
 # DELETE MEDICINE
-# =========================
+# --------------------------------------------------
 
-@app.route(
-    "/medicines/delete/<int:id>",
-    methods=["POST"]
-)
-@admin_required
+@app.route("/medicines/delete/<int:id>", methods=["POST"])
+@login_required
 def delete_medicine(id):
-
-    medicine = db.get_or_404(
+    medicine = db.session.get(
         Medicine,
         id
     )
 
-    medicine_name = medicine.name
-
-    try:
-
-        db.session.delete(medicine)
-
-        db.session.commit()
-
-        log_activity(
-            f"Deleted medicine: {medicine_name}"
-        )
-
+    if not medicine:
         flash(
-            "Medicine deleted successfully.",
-            "success"
-        )
-
-    except Exception:
-
-        db.session.rollback()
-
-        flash(
-            "This medicine cannot be deleted.",
+            "Medicine not found.",
             "danger"
         )
+        return redirect(
+            url_for("medicines")
+        )
+
+    # Do not delete medicines that already have sales.
+    if Sale.query.filter_by(
+        medicine_id=medicine.id
+    ).first():
+        flash(
+            "This medicine cannot be deleted.",
+            "warning"
+        )
+        return redirect(
+            url_for("medicines")
+        )
+
+    medicine_name = medicine.name
+
+    db.session.delete(medicine)
+    db.session.commit()
+
+    log_activity(
+        f"Deleted medicine: {medicine_name}"
+    )
+
+    flash(
+        "Medicine deleted successfully.",
+        "success"
+    )
 
     return redirect(
         url_for("medicines")
     )
 
 
-# =========================
+# --------------------------------------------------
 # SALES
-# =========================
+# --------------------------------------------------
 
-@app.route(
-    "/sales",
-    methods=["GET", "POST"]
-)
+@app.route("/sales", methods=["GET", "POST"])
 def sales():
-
     search = request.args.get(
         "search",
         ""
     ).strip()
 
-    # -------------------------
+    # ----------------------------------------------
     # CREATE SALE
-    # -------------------------
+    # ----------------------------------------------
 
     if request.method == "POST":
 
         if not current_user.is_authenticated:
-
             flash(
                 "Please log in to make a sale.",
                 "warning"
             )
-
             return redirect(
                 url_for("login")
             )
 
         try:
-
             medicine_id = int(
                 request.form.get(
                     "medicine_id"
@@ -979,23 +702,19 @@ def sales():
             )
 
         except (TypeError, ValueError):
-
             flash(
                 "Invalid sale information.",
                 "danger"
             )
-
             return redirect(
                 url_for("sales")
             )
 
         if quantity <= 0:
-
             flash(
                 "Quantity must be greater than zero.",
                 "danger"
             )
-
             return redirect(
                 url_for("sales")
             )
@@ -1006,23 +725,19 @@ def sales():
         )
 
         if not medicine:
-
             flash(
                 "Medicine not found.",
                 "danger"
             )
-
             return redirect(
                 url_for("sales")
             )
 
         if medicine.quantity < quantity:
-
             flash(
-                "Not enough stock.",
+                "Not enough stock available.",
                 "danger"
             )
-
             return redirect(
                 url_for("sales")
             )
@@ -1031,6 +746,7 @@ def sales():
             medicine.selling_price * quantity
         )
 
+        # Decrease stock
         medicine.quantity -= quantity
 
         sale = Sale(
@@ -1041,7 +757,6 @@ def sales():
         )
 
         db.session.add(sale)
-
         db.session.commit()
 
         log_activity(
@@ -1057,43 +772,46 @@ def sales():
             url_for("sales")
         )
 
-    # -------------------------
+    # ----------------------------------------------
     # MEDICINE SEARCH
-    # -------------------------
+    # ----------------------------------------------
 
     if search:
-
-        medicines_list = Medicine.query.filter(
-            db.or_(
-                Medicine.name.ilike(
-                    f"%{search}%"
-                ),
-
-                Medicine.barcode.ilike(
-                    f"%{search}%"
-                ),
-
-                Medicine.category.ilike(
-                    f"%{search}%"
+        medicines_list = (
+            Medicine.query
+            .filter(
+                db.or_(
+                    Medicine.name.ilike(
+                        f"%{search}%"
+                    ),
+                    Medicine.barcode.ilike(
+                        f"%{search}%"
+                    ),
+                    Medicine.category.ilike(
+                        f"%{search}%"
+                    )
                 )
             )
-        ).order_by(
-            Medicine.name
-        ).all()
-
+            .order_by(Medicine.name)
+            .all()
+        )
     else:
+        medicines_list = (
+            Medicine.query
+            .order_by(Medicine.name)
+            .all()
+        )
 
-        medicines_list = Medicine.query.order_by(
-            Medicine.name
-        ).all()
-
-    # -------------------------
+    # ----------------------------------------------
     # RECENT SALES
-    # -------------------------
+    # ----------------------------------------------
 
-    recent_sales = Sale.query.order_by(
-        Sale.sale_date.desc()
-    ).limit(10).all()
+    recent_sales = (
+        Sale.query
+        .order_by(Sale.sale_date.desc())
+        .limit(10)
+        .all()
+    )
 
     return render_template(
         "sales.html",
@@ -1103,17 +821,83 @@ def sales():
     )
 
 
-# =========================
+# --------------------------------------------------
+# DELETE SALE
+# --------------------------------------------------
+
+@app.route("/sales/delete/<int:id>", methods=["POST"])
+@login_required
+def delete_sale(id):
+    sale = db.session.get(
+        Sale,
+        id
+    )
+
+    if not sale:
+        flash(
+            "Sale record not found.",
+            "danger"
+        )
+        return redirect(
+            url_for("sales")
+        )
+
+    medicine = db.session.get(
+        Medicine,
+        sale.medicine_id
+    )
+
+    sale_quantity = sale.quantity
+
+    if medicine:
+        medicine.quantity += sale.quantity
+
+    medicine_name = (
+        medicine.name
+        if medicine
+        else "Unknown medicine"
+    )
+
+    db.session.delete(sale)
+    db.session.commit()
+
+    log_activity(
+        f"Deleted sale record: "
+        f"{sale_quantity} x {medicine_name}"
+    )
+
+    flash(
+        "Sale record deleted successfully. "
+        "The quantity was returned to stock.",
+        "success"
+    )
+
+    return redirect(
+        url_for("sales")
+    )
+
+
+# --------------------------------------------------
 # USERS
-# =========================
+# --------------------------------------------------
 
 @app.route("/users")
-@admin_required
+@login_required
 def users():
+    if not admin_required():
+        flash(
+            "Admin access required.",
+            "danger"
+        )
+        return redirect(
+            url_for("index")
+        )
 
-    users_list = User.query.order_by(
-        User.username
-    ).all()
+    users_list = (
+        User.query
+        .order_by(User.username)
+        .all()
+    )
 
     return render_template(
         "users.html",
@@ -1121,152 +905,72 @@ def users():
     )
 
 
-# =========================
-# ADD USER
-# =========================
-
-@app.route(
-    "/users/add",
-    methods=["GET", "POST"]
-)
-@admin_required
+@app.route("/users/add", methods=["POST"])
+@login_required
 def add_user():
-
-    if request.method == "POST":
-
-        username = request.form.get(
-            "username",
-            ""
-        ).strip()
-
-        password = request.form.get(
-            "password",
-            ""
-        )
-
-        role = request.form.get(
-            "role",
-            "staff"
-        )
-
-        if role not in [
-            "admin",
-            "staff"
-        ]:
-
-            role = "staff"
-
-        if not username or not password:
-
-            flash(
-                "Username and password are required.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("add_user")
-            )
-
-        if len(password) < 8:
-
-            flash(
-                "Password must be at least 8 characters.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("add_user")
-            )
-
-        existing = User.query.filter_by(
-            username=username
-        ).first()
-
-        if existing:
-
-            flash(
-                "Username already exists.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("add_user")
-            )
-
-        user = User(
-            username=username,
-            role=role
-        )
-
-        user.set_password(
-            password
-        )
-
-        db.session.add(user)
-
-        db.session.commit()
-
-        log_activity(
-            f"Created user: {username}"
-        )
-
+    if not admin_required():
         flash(
-            "User created successfully.",
-            "success"
-        )
-
-        return redirect(
-            url_for("users")
-        )
-
-    return render_template(
-        "add_user.html"
-    )
-
-
-# =========================
-# TOGGLE USER
-# =========================
-
-@app.route(
-    "/users/toggle/<int:id>",
-    methods=["POST"]
-)
-@admin_required
-def toggle_user(id):
-
-    user = db.get_or_404(
-        User,
-        id
-    )
-
-    if user.id == current_user.id:
-
-        flash(
-            "You cannot disable your own account.",
+            "Admin access required.",
             "danger"
         )
+        return redirect(
+            url_for("index")
+        )
 
+    username = request.form.get(
+        "username",
+        ""
+    ).strip()
+
+    password = request.form.get(
+        "password",
+        ""
+    )
+
+    role = request.form.get(
+        "role",
+        "staff"
+    )
+
+    if not username or not password:
+        flash(
+            "Username and password are required.",
+            "danger"
+        )
         return redirect(
             url_for("users")
         )
 
-    user.is_active_user = not user.is_active_user
+    if User.query.filter_by(
+        username=username
+    ).first():
+        flash(
+            "Username already exists.",
+            "danger"
+        )
+        return redirect(
+            url_for("users")
+        )
 
-    db.session.commit()
+    if role not in ["admin", "staff"]:
+        role = "staff"
 
-    status = (
-        "enabled"
-        if user.is_active_user
-        else "disabled"
+    user = User(
+        username=username,
+        role=role
     )
 
+    user.set_password(password)
+
+    db.session.add(user)
+    db.session.commit()
+
     log_activity(
-        f"{status.capitalize()} user: {user.username}"
+        f"Created user: {username}"
     )
 
     flash(
-        f"User {user.username} is now {status}.",
+        "User created successfully.",
         "success"
     )
 
@@ -1275,17 +979,93 @@ def toggle_user(id):
     )
 
 
-# =========================
+@app.route("/users/delete/<int:id>", methods=["POST"])
+@login_required
+def delete_user(id):
+    if not admin_required():
+        flash(
+            "Admin access required.",
+            "danger"
+        )
+        return redirect(
+            url_for("index")
+        )
+
+    user = db.session.get(
+        User,
+        id
+    )
+
+    if not user:
+        flash(
+            "User not found.",
+            "danger"
+        )
+        return redirect(
+            url_for("users")
+        )
+
+    if user.id == current_user.id:
+        flash(
+            "You cannot delete your own account.",
+            "warning"
+        )
+        return redirect(
+            url_for("users")
+        )
+
+    if Sale.query.filter_by(
+        sold_by=user.id
+    ).first():
+        flash(
+            "This user has sales records and cannot be deleted.",
+            "warning"
+        )
+        return redirect(
+            url_for("users")
+        )
+
+    username = user.username
+
+    db.session.delete(user)
+    db.session.commit()
+
+    log_activity(
+        f"Deleted user: {username}"
+    )
+
+    flash(
+        "User deleted successfully.",
+        "success"
+    )
+
+    return redirect(
+        url_for("users")
+    )
+
+
+# --------------------------------------------------
 # ACTIVITY LOGS
-# =========================
+# --------------------------------------------------
 
 @app.route("/logs")
-@admin_required
+@login_required
 def logs():
+    if not admin_required():
+        flash(
+            "Admin access required.",
+            "danger"
+        )
+        return redirect(
+            url_for("index")
+        )
 
-    logs_list = ActivityLog.query.order_by(
-        ActivityLog.created_at.desc()
-    ).all()
+    logs_list = (
+        ActivityLog.query
+        .order_by(ActivityLog.timestamp.desc())
+        .limit(100)
+        .all()
+    )
 
     return render_template(
         "logs.html",
@@ -1293,78 +1073,35 @@ def logs():
     )
 
 
-# =========================
-# DATABASE INITIALIZATION
-# =========================
+# --------------------------------------------------
+# ERROR HANDLERS
+# --------------------------------------------------
 
-def initialize_database():
-
-    with app.app_context():
-
-        db.create_all()
-
-        admin = User.query.filter_by(
-            username="admin"
-        ).first()
-
-        # Create admin if it doesn't exist
-        if admin is None:
-
-            initial_password = os.getenv(
-                "INITIAL_ADMIN_PASSWORD"
-            )
-
-            if not initial_password:
-
-                raise RuntimeError(
-                    "INITIAL_ADMIN_PASSWORD environment variable is missing."
-                )
-
-            admin = User(
-                username="admin",
-                role="admin"
-            )
-
-            admin.set_password(
-                initial_password
-            )
-
-            db.session.add(admin)
-
-            db.session.commit()
-
-            print(
-                "Initial admin account created."
-            )
-
-        # Optional one-time password reset
-        reset_password = os.getenv(
-            "RESET_ADMIN_PASSWORD",
-            ""
-        ).strip()
-
-        if reset_password:
-
-            admin.set_password(
-                reset_password
-            )
-
-            db.session.commit()
-
-            print(
-                "ADMIN PASSWORD RESET SUCCESS"
-            )
+@app.errorhandler(404)
+def page_not_found(error):
+    return render_template(
+        "404.html"
+    ), 404
 
 
-# =========================
-# START
-# =========================
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
 
-initialize_database()
+    return render_template(
+        "500.html"
+    ), 500
+
+
+# --------------------------------------------------
+# STARTUP
+# --------------------------------------------------
+
+with app.app_context():
+    initialize_database()
 
 
 if __name__ == "__main__":
-
     app.run(
         host="0.0.0.0",
         port=int(
@@ -1373,5 +1110,5 @@ if __name__ == "__main__":
                 5000
             )
         ),
-        debug=True
+        debug=False
     )
