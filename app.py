@@ -37,14 +37,12 @@ if not DATABASE_URL:
 # =========================================================
 # POSTGRESQL DRIVER FIX
 # =========================================================
+
+# Render PostgreSQL URLs may start with:
+# postgres://
+# postgresql://
 #
-# Render may provide:
-#
-# postgres://...
-# postgresql://...
-#
-# We explicitly force SQLAlchemy to use psycopg 3.
-#
+# We explicitly use psycopg 3.
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace(
@@ -56,13 +54,6 @@ if DATABASE_URL.startswith("postgres://"):
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(
         "postgresql://",
-        "postgresql+psycopg://",
-        1
-    )
-
-elif DATABASE_URL.startswith("postgresql+psycopg2://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgresql+psycopg2://",
         "postgresql+psycopg://",
         1
     )
