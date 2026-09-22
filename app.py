@@ -30,7 +30,6 @@ database_url = os.getenv(
     "sqlite:///pharmacy.db"
 )
 
-# PostgreSQL URL compatibility
 if database_url.startswith("postgres://"):
     database_url = database_url.replace(
         "postgres://",
@@ -70,7 +69,7 @@ login_manager.login_message_category = "warning"
 
 
 # =========================================================
-# MODELS
+# USER
 # =========================================================
 
 class User(UserMixin, db.Model):
@@ -105,15 +104,29 @@ class User(UserMixin, db.Model):
         lazy=True
     )
 
+    orders = db.relationship(
+        "Order",
+        backref="customer",
+        lazy=True
+    )
+
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+
+        self.password_hash = generate_password_hash(
+            password
+        )
 
     def check_password(self, password):
+
         return check_password_hash(
             self.password_hash,
             password
         )
 
+
+# =========================================================
+# MEDICINE
+# =========================================================
 
 class Medicine(db.Model):
 
@@ -164,6 +177,16 @@ class Medicine(db.Model):
         lazy=True
     )
 
+    order_items = db.relationship(
+        "OrderItem",
+        backref="medicine",
+        lazy=True
+    )
+
+
+# =========================================================
+# SALE
+# =========================================================
 
 class Sale(db.Model):
 
@@ -203,6 +226,10 @@ class Sale(db.Model):
     )
 
 
+# =========================================================
+# ACTIVITY LOG
+# =========================================================
+
 class ActivityLog(db.Model):
 
     __tablename__ = "activity_logs"
@@ -235,6 +262,92 @@ class ActivityLog(db.Model):
 
 
 # =========================================================
+# ORDER
+# =========================================================
+
+class Order(db.Model):
+
+    __tablename__ = "orders"
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False
+    )
+
+    status = db.Column(
+        db.String(20),
+        default="Pending",
+        nullable=False
+    )
+
+    total_price = db.Column(
+        db.Float,
+        default=0,
+        nullable=False
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    items = db.relationship(
+        "OrderItem",
+        backref="order",
+        lazy=True,
+        cascade="all, delete-orphan"
+    )
+
+
+# =========================================================
+# ORDER ITEM
+# =========================================================
+
+class OrderItem(db.Model):
+
+    __tablename__ = "order_items"
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    order_id = db.Column(
+        db.Integer,
+        db.ForeignKey("orders.id"),
+        nullable=False
+    )
+
+    medicine_id = db.Column(
+        db.Integer,
+        db.ForeignKey("medicines.id"),
+        nullable=False
+    )
+
+    quantity = db.Column(
+        db.Integer,
+        nullable=False
+    )
+
+    unit_price = db.Column(
+        db.Float,
+        nullable=False
+    )
+
+    total_price = db.Column(
+        db.Float,
+        nullable=False
+    )
+
+
+# =========================================================
 # LOGIN USER LOADER
 # =========================================================
 
@@ -242,11 +355,14 @@ class ActivityLog(db.Model):
 def load_user(user_id):
 
     try:
+
         return db.session.get(
             User,
             int(user_id)
         )
+
     except (TypeError, ValueError):
+
         return None
 
 
@@ -303,7 +419,6 @@ def initialize_database():
         username="admin"
     ).first()
 
-    # Create admin if it doesn't exist
     if admin is None:
 
         initial_password = os.getenv(
@@ -324,9 +439,7 @@ def initialize_database():
             db.session.add(admin)
             db.session.commit()
 
-            print(
-                "ADMIN USER CREATED"
-            )
+            print("ADMIN USER CREATED")
 
         else:
 
@@ -334,7 +447,6 @@ def initialize_database():
                 "WARNING: INITIAL_ADMIN_PASSWORD is not set."
             )
 
-    # Optional password reset
     reset_password = os.getenv(
         "RESET_ADMIN_PASSWORD",
         ""
@@ -401,6 +513,10 @@ def index():
         .all()
     )
 
+    pending_orders = Order.query.filter_by(
+        status="Pending"
+    ).count()
+
     return render_template(
         "index.html",
         total_medicines=medicine_count,
@@ -409,7 +525,8 @@ def index():
         today_sales=today_sales,
         low_stock=low_stock,
         expiring_soon=expiring_soon,
-        recent_sales=recent_sales
+        recent_sales=recent_sales,
+        pending_orders=pending_orders
     )
 
 
@@ -569,20 +686,39 @@ def add_medicine():
             ""
         ).strip()
 
-        quantity_text = request.form.get(
-            "quantity",
-            "0"
-        )
+        try:
 
-        purchase_price_text = request.form.get(
-            "purchase_price",
-            "0"
-        )
+            quantity = int(
+                request.form.get(
+                    "quantity",
+                    "0"
+                )
+            )
 
-        selling_price_text = request.form.get(
-            "selling_price",
-            "0"
-        )
+            purchase_price = float(
+                request.form.get(
+                    "purchase_price",
+                    "0"
+                )
+            )
+
+            selling_price = float(
+                request.form.get(
+                    "selling_price",
+                    "0"
+                )
+            )
+
+        except (TypeError, ValueError):
+
+            flash(
+                "Invalid quantity or price.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("add_medicine")
+            )
 
         expiry_date_text = request.form.get(
             "expiry_date",
@@ -593,31 +729,6 @@ def add_medicine():
 
             flash(
                 "Medicine name is required.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("add_medicine")
-            )
-
-        try:
-
-            quantity = int(
-                quantity_text
-            )
-
-            purchase_price = float(
-                purchase_price_text
-            )
-
-            selling_price = float(
-                selling_price_text
-            )
-
-        except (TypeError, ValueError):
-
-            flash(
-                "Invalid quantity or price.",
                 "danger"
             )
 
@@ -649,11 +760,11 @@ def add_medicine():
 
         if barcode:
 
-            existing_barcode = Medicine.query.filter_by(
+            existing = Medicine.query.filter_by(
                 barcode=barcode
             ).first()
 
-            if existing_barcode:
+            if existing:
 
                 flash(
                     "This barcode already exists.",
@@ -780,30 +891,33 @@ def edit_medicine(id):
             ""
         ).strip()
 
-        quantity_text = request.form.get(
-            "quantity",
-            "0"
-        )
+        try:
 
-        purchase_price_text = request.form.get(
-            "purchase_price",
-            "0"
-        )
+            quantity = int(
+                request.form.get(
+                    "quantity",
+                    "0"
+                )
+            )
 
-        selling_price_text = request.form.get(
-            "selling_price",
-            "0"
-        )
+            purchase_price = float(
+                request.form.get(
+                    "purchase_price",
+                    "0"
+                )
+            )
 
-        expiry_date_text = request.form.get(
-            "expiry_date",
-            ""
-        ).strip()
+            selling_price = float(
+                request.form.get(
+                    "selling_price",
+                    "0"
+                )
+            )
 
-        if not name:
+        except (TypeError, ValueError):
 
             flash(
-                "Medicine name is required.",
+                "Invalid quantity or price.",
                 "danger"
             )
 
@@ -814,24 +928,15 @@ def edit_medicine(id):
                 )
             )
 
-        try:
+        expiry_date_text = request.form.get(
+            "expiry_date",
+            ""
+        ).strip()
 
-            quantity = int(
-                quantity_text
-            )
-
-            purchase_price = float(
-                purchase_price_text
-            )
-
-            selling_price = float(
-                selling_price_text
-            )
-
-        except (TypeError, ValueError):
+        if not name:
 
             flash(
-                "Invalid quantity or price.",
+                "Medicine name is required.",
                 "danger"
             )
 
@@ -872,12 +977,12 @@ def edit_medicine(id):
 
         if barcode:
 
-            existing_barcode = Medicine.query.filter(
+            existing = Medicine.query.filter(
                 Medicine.barcode == barcode,
                 Medicine.id != medicine.id
             ).first()
 
-            if existing_barcode:
+            if existing:
 
                 flash(
                     "This barcode already exists.",
@@ -988,7 +1093,6 @@ def delete_medicine(id):
             url_for("medicines")
         )
 
-    # Medicine with sales history cannot be deleted.
     if Sale.query.filter_by(
         medicine_id=medicine.id
     ).first():
@@ -1054,10 +1158,6 @@ def sales():
         "search",
         ""
     ).strip()
-
-    # =====================================================
-    # CREATE SALE
-    # =====================================================
 
     if request.method == "POST":
 
@@ -1170,11 +1270,10 @@ def sales():
 
             db.session.rollback()
 
-            print("================================")
-            print("CREATE SALE ERROR")
-            print("ERROR TYPE:", type(e).__name__)
-            print("ERROR:", str(e))
-            print("================================")
+            print(
+                "CREATE SALE ERROR:",
+                repr(e)
+            )
 
             flash(
                 "Could not complete sale.",
@@ -1184,10 +1283,6 @@ def sales():
         return redirect(
             url_for("sales")
         )
-
-    # =====================================================
-    # MEDICINE SEARCH
-    # =====================================================
 
     if search:
 
@@ -1222,7 +1317,6 @@ def sales():
             .all()
         )
 
-    # Convert SQLAlchemy objects to JSON-safe dictionaries
     medicines_json = []
 
     for medicine in medicines_list:
@@ -1239,10 +1333,6 @@ def sales():
                 )
             }
         )
-
-    # =====================================================
-    # RECENT SALES
-    # =====================================================
 
     recent_sales = (
         Sale.query
@@ -1299,7 +1389,6 @@ def delete_sale(id):
             sale.quantity or 0
         )
 
-        # Return sold quantity to stock
         if medicine:
 
             medicine.quantity = (
@@ -1307,12 +1396,10 @@ def delete_sale(id):
                 + sale_quantity
             )
 
-        # Delete sale
         db.session.delete(
             sale
         )
 
-        # Commit
         db.session.commit()
 
         flash(
@@ -1340,6 +1427,506 @@ def delete_sale(id):
 
     return redirect(
         url_for("sales")
+    )
+
+
+# =========================================================
+# ORDERS - CUSTOMER
+# =========================================================
+
+@app.route(
+    "/orders",
+    methods=["GET", "POST"]
+)
+@login_required
+def orders():
+
+    if request.method == "POST":
+
+        medicine_id = request.form.get(
+            "medicine_id"
+        )
+
+        quantity_text = request.form.get(
+            "quantity",
+            "1"
+        )
+
+        try:
+
+            medicine_id = int(
+                medicine_id
+            )
+
+            quantity = int(
+                quantity_text
+            )
+
+        except (TypeError, ValueError):
+
+            flash(
+                "Invalid order information.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        if quantity <= 0:
+
+            flash(
+                "Quantity must be greater than zero.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        medicine = db.session.get(
+            Medicine,
+            medicine_id
+        )
+
+        if not medicine:
+
+            flash(
+                "Medicine not found.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        if medicine.quantity < quantity:
+
+            flash(
+                "Not enough stock available.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        total_price = (
+            float(medicine.selling_price or 0)
+            * quantity
+        )
+
+        try:
+
+            order = Order(
+                user_id=current_user.id,
+                status="Pending",
+                total_price=total_price
+            )
+
+            db.session.add(
+                order
+            )
+
+            db.session.flush()
+
+            item = OrderItem(
+                order_id=order.id,
+                medicine_id=medicine.id,
+                quantity=quantity,
+                unit_price=float(
+                    medicine.selling_price or 0
+                ),
+                total_price=total_price
+            )
+
+            db.session.add(
+                item
+            )
+
+            db.session.commit()
+
+            log_activity(
+                f"Created order #{order.id}"
+            )
+
+            flash(
+                "Order created successfully.",
+                "success"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "CREATE ORDER ERROR:",
+                repr(e)
+            )
+
+            flash(
+                "Could not create order.",
+                "danger"
+            )
+
+        return redirect(
+            url_for("orders")
+        )
+
+    medicines_list = (
+        Medicine.query
+        .filter(
+            Medicine.quantity > 0
+        )
+        .order_by(
+            Medicine.name
+        )
+        .all()
+    )
+
+    if admin_required():
+
+        orders_list = (
+            Order.query
+            .order_by(
+                Order.created_at.desc()
+            )
+            .all()
+        )
+
+    else:
+
+        orders_list = (
+            Order.query
+            .filter_by(
+                user_id=current_user.id
+            )
+            .order_by(
+                Order.created_at.desc()
+            )
+            .all()
+        )
+
+    return render_template(
+        "orders.html",
+        medicines=medicines_list,
+        orders=orders_list,
+        is_admin=admin_required()
+    )
+
+
+# =========================================================
+# UPDATE ORDER STATUS
+# =========================================================
+
+@app.route(
+    "/orders/<int:id>/status",
+    methods=["POST"]
+)
+@login_required
+def update_order_status(id):
+
+    if not admin_required():
+
+        flash(
+            "Admin access required.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("orders")
+        )
+
+    order = db.session.get(
+        Order,
+        id
+    )
+
+    if not order:
+
+        flash(
+            "Order not found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("orders")
+        )
+
+    new_status = request.form.get(
+        "status",
+        ""
+    ).strip()
+
+    allowed_statuses = [
+        "Pending",
+        "Approved",
+        "Completed",
+        "Cancelled"
+    ]
+
+    if new_status not in allowed_statuses:
+
+        flash(
+            "Invalid order status.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("orders")
+        )
+
+    # -----------------------------------------------------
+    # APPROVE ORDER
+    # -----------------------------------------------------
+
+    if new_status == "Approved":
+
+        if order.status == "Approved":
+
+            flash(
+                "This order is already approved.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        if order.status in [
+            "Completed",
+            "Cancelled"
+        ]:
+
+            flash(
+                "This order can no longer be approved.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        try:
+
+            # Check stock for every item first.
+            for item in order.items:
+
+                medicine = db.session.get(
+                    Medicine,
+                    item.medicine_id
+                )
+
+                if not medicine:
+
+                    raise ValueError(
+                        f"Medicine for order item "
+                        f"{item.id} was not found."
+                    )
+
+                if medicine.quantity < item.quantity:
+
+                    raise ValueError(
+                        f"Not enough stock for "
+                        f"{medicine.name}."
+                    )
+
+            # Reduce stock only after every item passes.
+            for item in order.items:
+
+                medicine = db.session.get(
+                    Medicine,
+                    item.medicine_id
+                )
+
+                medicine.quantity -= item.quantity
+
+            order.status = "Approved"
+
+            db.session.commit()
+
+            log_activity(
+                f"Approved order #{order.id}"
+            )
+
+            flash(
+                f"Order #{order.id} approved.",
+                "success"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "APPROVE ORDER ERROR:",
+                repr(e)
+            )
+
+            flash(
+                f"Could not approve order: {str(e)[:300]}",
+                "danger"
+            )
+
+        return redirect(
+            url_for("orders")
+        )
+
+    # -----------------------------------------------------
+    # CANCEL ORDER
+    # -----------------------------------------------------
+
+    if new_status == "Cancelled":
+
+        if order.status == "Cancelled":
+
+            flash(
+                "This order is already cancelled.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        if order.status in [
+            "Completed"
+        ]:
+
+            flash(
+                "Completed orders cannot be cancelled.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        try:
+
+            order.status = "Cancelled"
+
+            db.session.commit()
+
+            log_activity(
+                f"Cancelled order #{order.id}"
+            )
+
+            flash(
+                f"Order #{order.id} cancelled.",
+                "success"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "CANCEL ORDER ERROR:",
+                repr(e)
+            )
+
+            flash(
+                "Could not cancel order.",
+                "danger"
+            )
+
+        return redirect(
+            url_for("orders")
+        )
+
+    # -----------------------------------------------------
+    # COMPLETE ORDER
+    # -----------------------------------------------------
+
+    if new_status == "Completed":
+
+        if order.status != "Approved":
+
+            flash(
+                "Only approved orders can be completed.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("orders")
+            )
+
+        try:
+
+            order.status = "Completed"
+
+            db.session.commit()
+
+            log_activity(
+                f"Completed order #{order.id}"
+            )
+
+            flash(
+                f"Order #{order.id} completed.",
+                "success"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "COMPLETE ORDER ERROR:",
+                repr(e)
+            )
+
+            flash(
+                "Could not complete order.",
+                "danger"
+            )
+
+        return redirect(
+            url_for("orders")
+        )
+
+    # -----------------------------------------------------
+    # PENDING
+    # -----------------------------------------------------
+
+    if new_status == "Pending":
+
+        if order.status != "Approved":
+
+            order.status = "Pending"
+
+            try:
+
+                db.session.commit()
+
+                flash(
+                    f"Order #{order.id} set to pending.",
+                    "success"
+                )
+
+            except Exception as e:
+
+                db.session.rollback()
+
+                print(
+                    "UPDATE ORDER ERROR:",
+                    repr(e)
+                )
+
+                flash(
+                    "Could not update order.",
+                    "danger"
+                )
+
+        else:
+
+            flash(
+                "An approved order cannot be returned to pending.",
+                "warning"
+            )
+
+    return redirect(
+        url_for("orders")
     )
 
 
@@ -1568,25 +2155,37 @@ def delete_user(id):
             url_for("users")
         )
 
+    if Sale.query.filter_by(
+        sold_by=user.id
+    ).first():
+
+        flash(
+            "This user cannot be deleted because "
+            "they have sales history.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("users")
+        )
+
+    if Order.query.filter_by(
+        user_id=user.id
+    ).first():
+
+        flash(
+            "This user cannot be deleted because "
+            "they have order history.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("users")
+        )
+
     username = user.username
 
     try:
-
-        user_sales = Sale.query.filter_by(
-            sold_by=user.id
-        ).first()
-
-        if user_sales:
-
-            flash(
-                "This user cannot be deleted because "
-                "they have sales history.",
-                "warning"
-            )
-
-            return redirect(
-                url_for("users")
-            )
 
         db.session.delete(
             user
@@ -1684,7 +2283,7 @@ def internal_error(error):
 
 
 # =========================================================
-# INITIALIZE DATABASE
+# DATABASE
 # =========================================================
 
 with app.app_context():
@@ -1693,7 +2292,7 @@ with app.app_context():
 
 
 # =========================================================
-# START APP
+# RUN
 # =========================================================
 
 if __name__ == "__main__":
