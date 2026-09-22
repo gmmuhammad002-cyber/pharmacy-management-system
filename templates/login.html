@@ -1,29 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Login - Pharmacy Management System</title>
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Admin Login | Pharmacy Care</title>
 
     <link
         rel="stylesheet"
         href="{{ url_for('static', filename='style.css') }}"
     >
+
 </head>
 
-<body>
+
+<body class="login-page">
 
     <div class="login-container">
 
         <div class="login-card">
 
             <div class="login-header">
-                <div class="login-icon">💊</div>
 
-                <h1>Pharmacy Management System</h1>
+                <div class="login-icon">
+                    💊
+                </div>
 
-                <p>Sign in to your account</p>
+                <div class="login-brand">
+                    Pharmacy <strong>Care</strong>
+                </div>
+
+                <h1>Admin Login</h1>
+
+                <p>
+                    Sign in to manage your pharmacy
+                </p>
+
             </div>
 
 
@@ -44,7 +62,10 @@
             {% endwith %}
 
 
-            <form method="POST">
+            <form
+                method="POST"
+                action="{{ url_for('login') }}"
+            >
 
                 <div class="form-group">
 
@@ -52,14 +73,20 @@
                         Username
                     </label>
 
-                    <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        placeholder="Enter your username"
-                        required
-                        autofocus
-                    >
+                    <div class="input-with-icon">
+
+                        <span>👤</span>
+
+                        <input
+                            type="text"
+                            id="username"
+                            name="username"
+                            placeholder="Enter your username"
+                            required
+                            autofocus
+                        >
+
+                    </div>
 
                 </div>
 
@@ -70,13 +97,19 @@
                         Password
                     </label>
 
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        placeholder="Enter your password"
-                        required
-                    >
+                    <div class="input-with-icon">
+
+                        <span>🔒</span>
+
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Enter your password"
+                            required
+                        >
+
+                    </div>
 
                 </div>
 
@@ -85,14 +118,28 @@
                     type="submit"
                     class="btn btn-primary login-button"
                 >
-                    Sign In
+                    Sign In →
                 </button>
 
             </form>
+
+
+            <div class="login-footer">
+                🔐 Authorized pharmacy staff only
+            </div>
+
+
+            <a
+                href="{{ url_for('medicines') }}"
+                class="back-link"
+            >
+                ← Back to Medicines
+            </a>
 
         </div>
 
     </div>
 
 </body>
+
 </html>
