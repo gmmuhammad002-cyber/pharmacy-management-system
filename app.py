@@ -1,4 +1,5 @@
 import os
+import traceback
 from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, flash
@@ -56,7 +57,6 @@ elif database_url.startswith("postgresql+psycopg2://"):
         1
     )
 
-
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -70,9 +70,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 
 login_manager.login_view = "login"
-
 login_manager.login_message = "Please log in first."
-
 login_manager.login_message_category = "warning"
 
 
@@ -365,10 +363,15 @@ class OrderItem(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
 
-    return db.session.get(
-        User,
-        int(user_id)
-    )
+    try:
+        return db.session.get(
+            User,
+            int(user_id)
+        )
+
+    except (TypeError, ValueError):
+
+        return None
 
 
 # =========================================================
@@ -380,14 +383,24 @@ def log_activity(action):
     if not current_user.is_authenticated:
         return
 
-    log = ActivityLog(
-        user_id=current_user.id,
-        action=action
-    )
+    try:
 
-    db.session.add(log)
+        log = ActivityLog(
+            user_id=current_user.id,
+            action=action
+        )
 
-    db.session.commit()
+        db.session.add(log)
+        db.session.commit()
+
+    except Exception:
+
+        db.session.rollback()
+
+        print("================================")
+        print("ACTIVITY LOG ERROR")
+        traceback.print_exc()
+        print("================================")
 
 
 # =========================================================
@@ -408,59 +421,68 @@ def admin_required():
 
 def initialize_database():
 
-    db.create_all()
+    try:
 
-    admin = User.query.filter_by(
-        username="admin"
-    ).first()
+        db.create_all()
 
-    if admin is None:
+        admin = User.query.filter_by(
+            username="admin"
+        ).first()
 
-        initial_password = os.getenv(
-            "INITIAL_ADMIN_PASSWORD"
-        )
+        if admin is None:
 
-        if not initial_password:
-
-            print(
-                "WARNING: INITIAL_ADMIN_PASSWORD is not set."
+            initial_password = os.getenv(
+                "INITIAL_ADMIN_PASSWORD"
             )
 
-            return
+            if not initial_password:
 
-        admin = User(
-            username="admin",
-            role="admin"
-        )
+                print(
+                    "WARNING: INITIAL_ADMIN_PASSWORD is not set."
+                )
 
-        admin.set_password(
-            initial_password
-        )
+                return
 
-        db.session.add(admin)
+            admin = User(
+                username="admin",
+                role="admin"
+            )
 
-        db.session.commit()
+            admin.set_password(
+                initial_password
+            )
 
-        print(
-            "ADMIN USER CREATED"
-        )
+            db.session.add(admin)
+            db.session.commit()
 
-    reset_password = os.getenv(
-        "RESET_ADMIN_PASSWORD",
-        ""
-    ).strip()
+            print("ADMIN USER CREATED")
 
-    if reset_password:
+        reset_password = os.getenv(
+            "RESET_ADMIN_PASSWORD",
+            ""
+        ).strip()
 
-        admin.set_password(
-            reset_password
-        )
+        if reset_password:
 
-        db.session.commit()
+            admin.set_password(
+                reset_password
+            )
 
-        print(
-            "ADMIN PASSWORD RESET SUCCESS"
-        )
+            db.session.commit()
+
+            print(
+                "ADMIN PASSWORD RESET SUCCESS"
+            )
+
+    except Exception:
+
+        db.session.rollback()
+
+        print("================================")
+        print("DATABASE INITIALIZATION ERROR")
+        print("ERROR TYPE:", type(Exception).__name__)
+        traceback.print_exc()
+        print("================================")
 
 
 # =========================================================
@@ -475,9 +497,7 @@ def index():
 
     total_stock = (
         db.session.query(
-            db.func.sum(
-                Medicine.quantity
-            )
+            db.func.sum(Medicine.quantity)
         ).scalar()
         or 0
     )
@@ -488,9 +508,7 @@ def index():
 
     today_sales = (
         db.session.query(
-            db.func.sum(
-                Sale.total_price
-            )
+            db.func.sum(Sale.total_price)
         )
         .filter(
             db.func.date(
@@ -555,24 +573,94 @@ def login():
             ""
         )
 
-        user = User.query.filter_by(
-            username=username
-        ).first()
+        try:
 
-        if user and user.check_password(
-            password
-        ):
+            print("================================")
+            print("LOGIN ATTEMPT")
+            print("USERNAME:", username)
+            print("================================")
 
-            login_user(user)
+            user = User.query.filter_by(
+                username=username
+            ).first()
 
-            return redirect(
-                url_for("index")
+            if user is None:
+
+                print(
+                    "LOGIN RESULT: USER NOT FOUND"
+                )
+
+                flash(
+                    "Invalid username or password.",
+                    "danger"
+                )
+
+                return render_template(
+                    "login.html"
+                )
+
+            print(
+                "USER FOUND:",
+                user.username
             )
 
-        flash(
-            "Invalid username or password.",
-            "danger"
-        )
+            print(
+                "USER ROLE:",
+                user.role
+            )
+
+            password_ok = user.check_password(
+                password
+            )
+
+            print(
+                "PASSWORD CHECK:",
+                "SUCCESS" if password_ok else "FAILED"
+            )
+
+            if password_ok:
+
+                login_user(user)
+
+                print(
+                    "LOGIN USER: SUCCESS"
+                )
+
+                print(
+                    "REDIRECTING TO DASHBOARD"
+                )
+
+                return redirect(
+                    url_for("index")
+                )
+
+            flash(
+                "Invalid username or password.",
+                "danger"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print("================================")
+            print("LOGIN ERROR")
+            print(
+                "ERROR TYPE:",
+                type(e).__name__
+            )
+            print(
+                "ERROR:",
+                str(e)
+            )
+            print("TRACEBACK:")
+            traceback.print_exc()
+            print("================================")
+
+            flash(
+                "Login error. Please check the server logs.",
+                "danger"
+            )
 
     return render_template(
         "login.html"
@@ -765,7 +853,6 @@ def add_medicine():
         )
 
         db.session.add(medicine)
-
         db.session.commit()
 
         log_activity(
@@ -1124,7 +1211,6 @@ def sales():
         )
 
         db.session.add(sale)
-
         db.session.commit()
 
         log_activity(
@@ -1240,11 +1326,18 @@ def delete_sale(id):
 
         db.session.rollback()
 
+        print("================================")
+        print("DELETE SALE ERROR")
         print(
-            "DELETE SALE ERROR:",
-            type(e).__name__,
+            "ERROR TYPE:",
+            type(e).__name__
+        )
+        print(
+            "ERROR:",
             str(e)
         )
+        traceback.print_exc()
+        print("================================")
 
         flash(
             f"Delete error: {type(e).__name__}: {str(e)[:300]}",
@@ -1265,10 +1358,6 @@ def delete_sale(id):
     methods=["GET", "POST"]
 )
 def orders():
-
-    # -----------------------------------------------------
-    # CREATE PUBLIC ORDER
-    # -----------------------------------------------------
 
     if request.method == "POST":
 
@@ -1315,7 +1404,6 @@ def orders():
                 url_for("orders")
             )
 
-        # Customer name
         if not customer_name:
 
             flash(
@@ -1327,7 +1415,6 @@ def orders():
                 url_for("orders")
             )
 
-        # Customer phone
         if not customer_phone:
 
             flash(
@@ -1339,7 +1426,6 @@ def orders():
                 url_for("orders")
             )
 
-        # Customer address
         if not customer_address:
 
             flash(
@@ -1351,7 +1437,6 @@ def orders():
                 url_for("orders")
             )
 
-        # Quantity
         if quantity <= 0:
 
             flash(
@@ -1406,9 +1491,6 @@ def orders():
             * quantity
         )
 
-        # Stock is NOT reduced when customer places order.
-        # Stock is reduced when admin approves it.
-
         order = Order(
             customer_name=customer_name,
             customer_phone=customer_phone,
@@ -1440,19 +1522,11 @@ def orders():
             )
         )
 
-    # -----------------------------------------------------
-    # AVAILABLE MEDICINES
-    # -----------------------------------------------------
-
     medicines = Medicine.query.filter(
         Medicine.quantity > 0
     ).order_by(
         Medicine.name.asc()
     ).all()
-
-    # -----------------------------------------------------
-    # ADMIN ORDERS
-    # -----------------------------------------------------
 
     all_orders = []
 
@@ -1540,10 +1614,6 @@ def update_order_status(id):
 
     old_status = order.status
 
-    # -----------------------------------------------------
-    # APPROVE
-    # -----------------------------------------------------
-
     if new_status == "Approved":
 
         if order.status != "Pending":
@@ -1557,7 +1627,6 @@ def update_order_status(id):
                 url_for("orders")
             )
 
-        # Check stock BEFORE changing anything
         for item in order.items:
 
             medicine = db.session.get(
@@ -1587,7 +1656,6 @@ def update_order_status(id):
                     url_for("orders")
                 )
 
-        # Reduce stock
         for item in order.items:
 
             medicine = db.session.get(
@@ -1598,10 +1666,6 @@ def update_order_status(id):
             medicine.quantity -= item.quantity
 
         order.status = "Approved"
-
-    # -----------------------------------------------------
-    # COMPLETED
-    # -----------------------------------------------------
 
     elif new_status == "Completed":
 
@@ -1617,10 +1681,6 @@ def update_order_status(id):
             )
 
         order.status = "Completed"
-
-    # -----------------------------------------------------
-    # CANCELLED
-    # -----------------------------------------------------
 
     elif new_status == "Cancelled":
 
@@ -1647,10 +1707,6 @@ def update_order_status(id):
             )
 
         order.status = "Cancelled"
-
-    # -----------------------------------------------------
-    # PENDING
-    # -----------------------------------------------------
 
     elif new_status == "Pending":
 
@@ -1785,7 +1841,6 @@ def add_user():
         )
 
         db.session.add(user)
-
         db.session.commit()
 
         log_activity(
@@ -1882,7 +1937,6 @@ def delete_user(id):
     username = user.username
 
     db.session.delete(user)
-
     db.session.commit()
 
     log_activity(
@@ -1944,6 +1998,20 @@ def page_not_found(error):
 def internal_error(error):
 
     db.session.rollback()
+
+    print("================================")
+    print("500 INTERNAL SERVER ERROR")
+    print(
+        "ERROR TYPE:",
+        type(error).__name__
+    )
+    print(
+        "ERROR:",
+        str(error)
+    )
+    print("TRACEBACK:")
+    traceback.print_exc()
+    print("================================")
 
     return render_template(
         "500.html"
