@@ -26,7 +26,9 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY environment variable is missing.")
+    raise RuntimeError(
+        "SECRET_KEY environment variable is missing."
+    )
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -38,20 +40,24 @@ if not DATABASE_URL:
 # POSTGRESQL DRIVER FIX
 # =========================================================
 
-# Render PostgreSQL URLs may start with:
-# postgres://
-# postgresql://
-#
-# We explicitly use psycopg 3.
-
 if DATABASE_URL.startswith("postgres://"):
+
     DATABASE_URL = DATABASE_URL.replace(
         "postgres://",
         "postgresql+psycopg://",
         1
     )
 
+elif DATABASE_URL.startswith("postgresql+psycopg2://"):
+
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgresql+psycopg2://",
+        "postgresql+psycopg://",
+        1
+    )
+
 elif DATABASE_URL.startswith("postgresql://"):
+
     DATABASE_URL = DATABASE_URL.replace(
         "postgresql://",
         "postgresql+psycopg://",
@@ -109,7 +115,9 @@ login_manager.init_app(app)
 
 login_manager.login_view = "login"
 
-login_manager.login_message = "Please log in to access this page."
+login_manager.login_message = (
+    "Please log in to access this page."
+)
 
 login_manager.login_message_category = "warning"
 
@@ -380,14 +388,17 @@ def admin_required(function):
 
 
 # =========================================================
-# HOME
+# HOME / DASHBOARD
 # =========================================================
 
 @app.route("/")
 def index():
 
     if not current_user.is_authenticated:
-        return redirect(url_for("medicines"))
+
+        return redirect(
+            url_for("medicines")
+        )
 
     medicine_count = Medicine.query.count()
 
@@ -1273,7 +1284,19 @@ def initialize_database():
 
         db.create_all()
 
-        if User.query.count() == 0:
+        # -------------------------------------------------
+        # Find existing admin
+        # -------------------------------------------------
+
+        admin = User.query.filter_by(
+            username="admin"
+        ).first()
+
+        # -------------------------------------------------
+        # Create admin if it does not exist
+        # -------------------------------------------------
+
+        if admin is None:
 
             initial_password = os.getenv(
                 "INITIAL_ADMIN_PASSWORD"
@@ -1282,7 +1305,8 @@ def initialize_database():
             if not initial_password:
 
                 raise RuntimeError(
-                    "INITIAL_ADMIN_PASSWORD environment variable is missing."
+                    "INITIAL_ADMIN_PASSWORD "
+                    "environment variable is missing."
                 )
 
             admin = User(
@@ -1297,6 +1321,30 @@ def initialize_database():
             db.session.add(admin)
 
             db.session.commit()
+
+            print(
+                "Initial admin account created."
+            )
+
+        # -------------------------------------------------
+        # Optional one-time password reset
+        # -------------------------------------------------
+
+        reset_password = os.getenv(
+            "RESET_ADMIN_PASSWORD"
+        )
+
+        if reset_password:
+
+            admin.set_password(
+                reset_password
+            )
+
+            db.session.commit()
+
+            print(
+                "Admin password has been reset."
+            )
 
 
 # =========================================================
