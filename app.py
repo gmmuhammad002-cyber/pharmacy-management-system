@@ -9,10 +9,14 @@ from flask_login import (
     login_user,
     logout_user,
     login_required,
-    current_user,
+    current_user
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
+
+# =========================================================
+# APP
+# =========================================================
 
 app = Flask(__name__)
 
@@ -26,7 +30,10 @@ app.config["SECRET_KEY"] = os.getenv(
 # DATABASE
 # =========================================================
 
-database_url = os.getenv("DATABASE_URL", "sqlite:///pharmacy.db")
+database_url = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///pharmacy.db"
+)
 
 if database_url.startswith("postgres://"):
     database_url = database_url.replace(
@@ -61,8 +68,11 @@ db = SQLAlchemy(app)
 # =========================================================
 
 login_manager = LoginManager(app)
+
 login_manager.login_view = "login"
+
 login_manager.login_message = "Please log in first."
+
 login_manager.login_message_category = "warning"
 
 
@@ -71,9 +81,13 @@ login_manager.login_message_category = "warning"
 # =========================================================
 
 class User(UserMixin, db.Model):
+
     __tablename__ = "users"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     username = db.Column(
         db.String(80),
@@ -98,16 +112,14 @@ class User(UserMixin, db.Model):
         lazy=True
     )
 
-    orders = db.relationship(
-        "Order",
-        backref="customer_user",
-        lazy=True
-    )
-
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+
+        self.password_hash = generate_password_hash(
+            password
+        )
 
     def check_password(self, password):
+
         return check_password_hash(
             self.password_hash,
             password
@@ -119,6 +131,7 @@ class User(UserMixin, db.Model):
 # =========================================================
 
 class Medicine(db.Model):
+
     __tablename__ = "medicines"
 
     id = db.Column(
@@ -178,6 +191,7 @@ class Medicine(db.Model):
 # =========================================================
 
 class Sale(db.Model):
+
     __tablename__ = "sales"
 
     id = db.Column(
@@ -219,6 +233,7 @@ class Sale(db.Model):
 # =========================================================
 
 class ActivityLog(db.Model):
+
     __tablename__ = "activity_logs"
 
     id = db.Column(
@@ -253,6 +268,7 @@ class ActivityLog(db.Model):
 # =========================================================
 
 class Order(db.Model):
+
     __tablename__ = "orders"
 
     id = db.Column(
@@ -260,7 +276,6 @@ class Order(db.Model):
         primary_key=True
     )
 
-    # Public customer bilgileri
     customer_name = db.Column(
         db.String(120),
         nullable=False
@@ -307,6 +322,7 @@ class Order(db.Model):
 # =========================================================
 
 class OrderItem(db.Model):
+
     __tablename__ = "order_items"
 
     id = db.Column(
@@ -348,26 +364,42 @@ class OrderItem(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+
+    return db.session.get(
+        User,
+        int(user_id)
+    )
 
 
 # =========================================================
-# HELPERS
+# ACTIVITY LOG HELPER
 # =========================================================
 
 def log_activity(action):
-    if current_user.is_authenticated:
-        log = ActivityLog(
-            user_id=current_user.id,
-            action=action
-        )
 
-        db.session.add(log)
-        db.session.commit()
+    if not current_user.is_authenticated:
+        return
 
+    log = ActivityLog(
+        user_id=current_user.id,
+        action=action
+    )
+
+    db.session.add(log)
+
+    db.session.commit()
+
+
+# =========================================================
+# ADMIN CHECK
+# =========================================================
 
 def admin_required():
-    return current_user.is_authenticated and current_user.role == "admin"
+
+    return (
+        current_user.is_authenticated
+        and current_user.role == "admin"
+    )
 
 
 # =========================================================
@@ -389,9 +421,11 @@ def initialize_database():
         )
 
         if not initial_password:
+
             print(
                 "WARNING: INITIAL_ADMIN_PASSWORD is not set."
             )
+
             return
 
         admin = User(
@@ -404,9 +438,12 @@ def initialize_database():
         )
 
         db.session.add(admin)
+
         db.session.commit()
 
-        print("ADMIN USER CREATED")
+        print(
+            "ADMIN USER CREATED"
+        )
 
     reset_password = os.getenv(
         "RESET_ADMIN_PASSWORD",
@@ -421,7 +458,9 @@ def initialize_database():
 
         db.session.commit()
 
-        print("ADMIN PASSWORD RESET SUCCESS")
+        print(
+            "ADMIN PASSWORD RESET SUCCESS"
+        )
 
 
 # =========================================================
@@ -434,19 +473,33 @@ def index():
 
     medicine_count = Medicine.query.count()
 
-    total_stock = db.session.query(
-        db.func.sum(Medicine.quantity)
-    ).scalar() or 0
+    total_stock = (
+        db.session.query(
+            db.func.sum(
+                Medicine.quantity
+            )
+        ).scalar()
+        or 0
+    )
 
     sales_count = Sale.query.count()
 
     today = datetime.utcnow().date()
 
-    today_sales = db.session.query(
-        db.func.sum(Sale.total_price)
-    ).filter(
-        db.func.date(Sale.sale_date) == today
-    ).scalar() or 0
+    today_sales = (
+        db.session.query(
+            db.func.sum(
+                Sale.total_price
+            )
+        )
+        .filter(
+            db.func.date(
+                Sale.sale_date
+            ) == today
+        )
+        .scalar()
+        or 0
+    )
 
     low_stock = Medicine.query.filter(
         Medicine.quantity <= 10
@@ -478,11 +531,17 @@ def index():
 # LOGIN
 # =========================================================
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
 def login():
 
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+
+        return redirect(
+            url_for("index")
+        )
 
     if request.method == "POST":
 
@@ -500,7 +559,9 @@ def login():
             username=username
         ).first()
 
-        if user and user.check_password(password):
+        if user and user.check_password(
+            password
+        ):
 
             login_user(user)
 
@@ -513,7 +574,9 @@ def login():
             "danger"
         )
 
-    return render_template("login.html")
+    return render_template(
+        "login.html"
+    )
 
 
 # =========================================================
@@ -547,9 +610,15 @@ def medicines():
 
         medicines = Medicine.query.filter(
             db.or_(
-                Medicine.name.ilike(f"%{search}%"),
-                Medicine.barcode.ilike(f"%{search}%"),
-                Medicine.category.ilike(f"%{search}%")
+                Medicine.name.ilike(
+                    f"%{search}%"
+                ),
+                Medicine.barcode.ilike(
+                    f"%{search}%"
+                ),
+                Medicine.category.ilike(
+                    f"%{search}%"
+                )
             )
         ).order_by(
             Medicine.name.asc()
@@ -597,6 +666,7 @@ def add_medicine():
         ).strip()
 
         try:
+
             quantity = int(
                 request.form.get(
                     "quantity",
@@ -639,6 +709,7 @@ def add_medicine():
         if expiry:
 
             try:
+
                 expiry_date = datetime.strptime(
                     expiry,
                     "%Y-%m-%d"
@@ -694,6 +765,7 @@ def add_medicine():
         )
 
         db.session.add(medicine)
+
         db.session.commit()
 
         log_activity(
@@ -779,7 +851,9 @@ def edit_medicine(id):
                     )
                 )
 
-        medicine.barcode = barcode or None
+        medicine.barcode = (
+            barcode or None
+        )
 
         try:
 
@@ -926,7 +1000,10 @@ def delete_medicine(id):
 
     name = medicine.name
 
-    db.session.delete(medicine)
+    db.session.delete(
+        medicine
+    )
+
     db.session.commit()
 
     log_activity(
@@ -980,7 +1057,10 @@ def sales():
                 )
             )
 
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError
+        ):
 
             flash(
                 "Invalid sale information.",
@@ -1030,7 +1110,8 @@ def sales():
             )
 
         total = (
-            medicine.selling_price * quantity
+            medicine.selling_price
+            * quantity
         )
 
         medicine.quantity -= quantity
@@ -1043,6 +1124,7 @@ def sales():
         )
 
         db.session.add(sale)
+
         db.session.commit()
 
         log_activity(
@@ -1142,7 +1224,10 @@ def delete_sale(id):
                 + sale_quantity
             )
 
-        db.session.delete(sale)
+        db.session.delete(
+            sale
+        )
+
         db.session.commit()
 
         flash(
@@ -1155,9 +1240,11 @@ def delete_sale(id):
 
         db.session.rollback()
 
-        print("DELETE SALE ERROR")
-        print(type(e).__name__)
-        print(str(e))
+        print(
+            "DELETE SALE ERROR:",
+            type(e).__name__,
+            str(e)
+        )
 
         flash(
             f"Delete error: {type(e).__name__}: {str(e)[:300]}",
@@ -1214,7 +1301,10 @@ def orders():
                 )
             )
 
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError
+        ):
 
             flash(
                 "Please select a medicine and enter a valid quantity.",
@@ -1225,7 +1315,7 @@ def orders():
                 url_for("orders")
             )
 
-        # Customer information
+        # Customer name
         if not customer_name:
 
             flash(
@@ -1237,6 +1327,7 @@ def orders():
                 url_for("orders")
             )
 
+        # Customer phone
         if not customer_phone:
 
             flash(
@@ -1248,6 +1339,7 @@ def orders():
                 url_for("orders")
             )
 
+        # Customer address
         if not customer_address:
 
             flash(
@@ -1259,6 +1351,7 @@ def orders():
                 url_for("orders")
             )
 
+        # Quantity
         if quantity <= 0:
 
             flash(
@@ -1309,12 +1402,12 @@ def orders():
             )
 
         total = (
-            medicine.selling_price * quantity
+            medicine.selling_price
+            * quantity
         )
 
-        # IMPORTANT:
-        # Stock is NOT reduced here.
-        # Admin approval reduces the stock.
+        # Stock is NOT reduced when customer places order.
+        # Stock is reduced when admin approves it.
 
         order = Order(
             customer_name=customer_name,
@@ -1325,6 +1418,7 @@ def orders():
         )
 
         db.session.add(order)
+
         db.session.flush()
 
         item = OrderItem(
@@ -1336,12 +1430,8 @@ def orders():
         )
 
         db.session.add(item)
-        db.session.commit()
 
-        flash(
-            f"Order #{order.id} placed successfully!",
-            "success"
-        )
+        db.session.commit()
 
         return redirect(
             url_for(
@@ -1351,7 +1441,7 @@ def orders():
         )
 
     # -----------------------------------------------------
-    # SHOW ORDERS
+    # AVAILABLE MEDICINES
     # -----------------------------------------------------
 
     medicines = Medicine.query.filter(
@@ -1360,25 +1450,35 @@ def orders():
         Medicine.name.asc()
     ).all()
 
-    # Admin sees all orders.
-    # Public users see the order form.
+    # -----------------------------------------------------
+    # ADMIN ORDERS
+    # -----------------------------------------------------
+
     all_orders = []
 
-    if current_user.is_authenticated and current_user.role == "admin":
+    if (
+        current_user.is_authenticated
+        and current_user.role == "admin"
+    ):
 
         all_orders = Order.query.order_by(
             Order.created_at.desc()
         ).all()
 
+    success_order = request.args.get(
+        "success"
+    )
+
     return render_template(
         "orders.html",
         medicines=medicines,
-        orders=all_orders
+        orders=all_orders,
+        success_order=success_order
     )
 
 
 # =========================================================
-# UPDATE ORDER STATUS - ADMIN ONLY
+# UPDATE ORDER STATUS
 # =========================================================
 
 @app.route(
@@ -1457,7 +1557,7 @@ def update_order_status(id):
                 url_for("orders")
             )
 
-        # Check ALL stock first
+        # Check stock BEFORE changing anything
         for item in order.items:
 
             medicine = db.session.get(
@@ -1500,7 +1600,7 @@ def update_order_status(id):
         order.status = "Approved"
 
     # -----------------------------------------------------
-    # COMPLETE
+    # COMPLETED
     # -----------------------------------------------------
 
     elif new_status == "Completed":
@@ -1519,13 +1619,11 @@ def update_order_status(id):
         order.status = "Completed"
 
     # -----------------------------------------------------
-    # CANCEL
+    # CANCELLED
     # -----------------------------------------------------
 
     elif new_status == "Cancelled":
 
-        # An approved order has already reduced stock.
-        # Therefore it cannot be cancelled here.
         if order.status == "Approved":
 
             flash(
@@ -1682,9 +1780,12 @@ def add_user():
             role=role
         )
 
-        user.set_password(password)
+        user.set_password(
+            password
+        )
 
         db.session.add(user)
+
         db.session.commit()
 
         log_activity(
@@ -1781,6 +1882,7 @@ def delete_user(id):
     username = user.username
 
     db.session.delete(user)
+
     db.session.commit()
 
     log_activity(
@@ -1798,7 +1900,7 @@ def delete_user(id):
 
 
 # =========================================================
-# ACTIVITY LOGS
+# LOGS
 # =========================================================
 
 @app.route("/logs")
@@ -1853,6 +1955,7 @@ def internal_error(error):
 # =========================================================
 
 with app.app_context():
+
     initialize_database()
 
 
