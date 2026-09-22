@@ -1,7 +1,6 @@
 Flask
-Flask-Login
 Flask-SQLAlchemy
+Flask-Login
 psycopg[binary]
-psycopg2-binary
 python-dotenv
 gunicorn
