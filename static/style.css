@@ -1731,3 +1731,347 @@ tbody tr:last-child td {
     }
 
 }
+/* =====================================================
+   PUBLIC ORDER SYSTEM
+===================================================== */
+
+.order-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.05);
+}
+
+
+.order-card-header {
+    margin-bottom: 22px;
+}
+
+
+.order-card-header h2 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    color: #2d3748;
+}
+
+
+.order-card-header p {
+    margin: 0;
+    color: #718096;
+    font-size: 14px;
+}
+
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+
+.form-group label {
+    display: block;
+    margin-bottom: 7px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dbe3ea;
+    border-radius: 9px;
+    padding: 11px 13px;
+    font-size: 14px;
+    background: #ffffff;
+    color: #2d3748;
+    outline: none;
+}
+
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: #319795;
+    box-shadow: 0 0 0 3px rgba(49, 151, 149, 0.12);
+}
+
+
+.form-group textarea {
+    resize: vertical;
+}
+
+
+.quantity-group {
+    max-width: 220px;
+}
+
+
+.order-button {
+    margin-top: 5px;
+}
+
+
+.medicine-results {
+    display: none;
+    margin-top: 7px;
+    border: 1px solid #dbe3ea;
+    border-radius: 10px;
+    background: #ffffff;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    max-height: 300px;
+    overflow-y: auto;
+    position: relative;
+    z-index: 20;
+}
+
+
+.medicine-result {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding: 13px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #edf2f7;
+}
+
+
+.medicine-result:last-child {
+    border-bottom: none;
+}
+
+
+.medicine-result:hover {
+    background: #f5f9fa;
+}
+
+
+.medicine-result strong {
+    display: block;
+    color: #2d3748;
+}
+
+
+.medicine-result small {
+    display: block;
+    margin-top: 4px;
+    color: #718096;
+    font-size: 12px;
+}
+
+
+.medicine-result > span {
+    text-align: right;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+
+.medicine-no-results {
+    padding: 16px;
+    text-align: center;
+    color: #718096;
+}
+
+
+.selected-medicine {
+    padding: 12px 14px;
+    margin-bottom: 18px;
+    border-radius: 9px;
+    background: #eef8f5;
+    color: #246b57;
+    border: 1px solid #d4eee4;
+}
+
+
+.order-success {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 18px 20px;
+    margin-bottom: 22px;
+    background: #e7f7ee;
+    border: 1px solid #c9ecd8;
+    border-radius: 12px;
+    color: #237a4b;
+}
+
+
+.success-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #237a4b;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 20px;
+}
+
+
+.order-success strong {
+    display: block;
+    font-size: 16px;
+}
+
+
+.order-success p {
+    margin: 4px 0 0;
+    font-size: 13px;
+}
+
+
+.admin-orders {
+    margin-top: 25px;
+}
+
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+
+.order-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1000px;
+}
+
+
+.order-table th {
+    text-align: left;
+    padding: 13px;
+    background: #f7fafc;
+    color: #4a5568;
+    font-size: 13px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+
+.order-table td {
+    padding: 14px 13px;
+    border-bottom: 1px solid #edf2f7;
+    vertical-align: middle;
+    color: #2d3748;
+}
+
+
+.customer-info {
+    display: block;
+    color: #718096;
+    font-size: 12px;
+    margin-top: 4px;
+    max-width: 180px;
+    word-break: break-word;
+}
+
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+
+.status-pending {
+    background: #fff4d6;
+    color: #946200;
+}
+
+
+.status-approved {
+    background: #e6f4ff;
+    color: #1769aa;
+}
+
+
+.status-completed {
+    background: #e7f7ee;
+    color: #237a4b;
+}
+
+
+.status-cancelled {
+    background: #fdeaea;
+    color: #b42318;
+}
+
+
+.order-status-form {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+
+.order-status-form .status-select {
+    width: 115px;
+    min-width: 115px;
+    padding: 8px 10px;
+    border: 1px solid #dbe3ea;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #2d3748;
+}
+
+
+.button.small {
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+
+.empty-state {
+    padding: 35px;
+    text-align: center;
+    color: #718096;
+    background: #f7fafc;
+    border-radius: 10px;
+}
+
+
+@media (max-width: 700px) {
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+
+    .order-card {
+        padding: 18px;
+    }
+
+
+    .quantity-group {
+        max-width: 100%;
+    }
+
+
+    .order-button {
+        width: 100%;
+    }
+
+
+    .order-success {
+        align-items: flex-start;
+    }
+
+}
