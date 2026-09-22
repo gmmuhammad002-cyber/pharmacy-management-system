@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, date
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -55,21 +55,23 @@ elif database_url.startswith("postgresql+psycopg2://"):
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+
 db = SQLAlchemy(app)
 
 
 # =========================================================
-# LOGIN MANAGER
+# LOGIN
 # =========================================================
 
 login_manager = LoginManager(app)
+
 login_manager.login_view = "login"
 login_manager.login_message = "Please log in first."
 login_manager.login_message_category = "warning"
 
 
 # =========================================================
-# DATABASE MODELS
+# MODELS
 # =========================================================
 
 class User(UserMixin, db.Model):
@@ -235,18 +237,26 @@ class ActivityLog(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(
-        User,
-        int(user_id)
-    )
+
+    try:
+        return db.session.get(
+            User,
+            int(user_id)
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 # =========================================================
-# HELPERS
+# ACTIVITY LOG
 # =========================================================
 
 def log_activity(action):
-    if current_user.is_authenticated:
+
+    if not current_user.is_authenticated:
+        return
+
+    try:
 
         log = ActivityLog(
             user_id=current_user.id,
@@ -256,8 +266,22 @@ def log_activity(action):
         db.session.add(log)
         db.session.commit()
 
+    except Exception as e:
+
+        db.session.rollback()
+
+        print(
+            "ACTIVITY LOG ERROR:",
+            repr(e)
+        )
+
+
+# =========================================================
+# ADMIN CHECK
+# =========================================================
 
 def admin_required():
+
     return (
         current_user.is_authenticated
         and current_user.role == "admin"
@@ -276,7 +300,7 @@ def initialize_database():
         username="admin"
     ).first()
 
-    # Create admin if it doesn't exist
+    # Create admin if it does not exist
     if admin is None:
 
         initial_password = os.getenv(
@@ -297,16 +321,17 @@ def initialize_database():
             db.session.add(admin)
             db.session.commit()
 
-            print("ADMIN USER CREATED")
+            print(
+                "ADMIN USER CREATED"
+            )
 
         else:
 
             print(
-                "WARNING: INITIAL_ADMIN_PASSWORD "
-                "is not set."
+                "WARNING: INITIAL_ADMIN_PASSWORD is not set."
             )
 
-    # Optional password reset
+    # Optional admin password reset
     reset_password = os.getenv(
         "RESET_ADMIN_PASSWORD",
         ""
@@ -338,9 +363,7 @@ def index():
     total_stock = (
         db.session.query(
             db.func.coalesce(
-                db.func.sum(
-                    Medicine.quantity
-                ),
+                db.func.sum(Medicine.quantity),
                 0
             )
         ).scalar()
@@ -353,9 +376,7 @@ def index():
     today_sales = (
         db.session.query(
             db.func.coalesce(
-                db.func.sum(
-                    Sale.total_price
-                ),
+                db.func.sum(Sale.total_price),
                 0
             )
         )
@@ -428,9 +449,7 @@ def login():
             username=username
         ).first()
 
-        if user and user.check_password(
-            password
-        ):
+        if user and user.check_password(password):
 
             login_user(user)
 
@@ -554,33 +573,30 @@ def add_medicine():
             ""
         ).strip()
 
-        try:
+        quantity_text = request.form.get(
+            "quantity",
+            "0"
+        )
 
-            quantity = int(
-                request.form.get(
-                    "quantity",
-                    0
-                )
-            )
+        purchase_price_text = request.form.get(
+            "purchase_price",
+            "0"
+        )
 
-            purchase_price = float(
-                request.form.get(
-                    "purchase_price",
-                    0
-                )
-            )
+        selling_price_text = request.form.get(
+            "selling_price",
+            "0"
+        )
 
-            selling_price = float(
-                request.form.get(
-                    "selling_price",
-                    0
-                )
-            )
+        expiry_date_text = request.form.get(
+            "expiry_date",
+            ""
+        ).strip()
 
-        except (TypeError, ValueError):
+        if not name:
 
             flash(
-                "Invalid medicine information.",
+                "Medicine name is required.",
                 "danger"
             )
 
@@ -588,37 +604,24 @@ def add_medicine():
                 url_for("add_medicine")
             )
 
-        expiry_date = None
+        try:
 
-        expiry_value = request.form.get(
-            "expiry_date",
-            ""
-        ).strip()
+            quantity = int(
+                quantity_text
+            )
 
-        if expiry_value:
+            purchase_price = float(
+                purchase_price_text
+            )
 
-            try:
+            selling_price = float(
+                selling_price_text
+            )
 
-                expiry_date = datetime.strptime(
-                    expiry_value,
-                    "%Y-%m-%d"
-                ).date()
-
-            except ValueError:
-
-                flash(
-                    "Invalid expiry date.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("add_medicine")
-                )
-
-        if not name:
+        except (TypeError, ValueError):
 
             flash(
-                "Medicine name is required.",
+                "Invalid quantity or price.",
                 "danger"
             )
 
@@ -637,16 +640,49 @@ def add_medicine():
                 url_for("add_medicine")
             )
 
+        if purchase_price < 0 or selling_price < 0:
+
+            flash(
+                "Price cannot be negative.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("add_medicine")
+            )
+
         if barcode:
 
-            existing = Medicine.query.filter_by(
+            existing_barcode = Medicine.query.filter_by(
                 barcode=barcode
             ).first()
 
-            if existing:
+            if existing_barcode:
 
                 flash(
-                    "A medicine with this barcode already exists.",
+                    "This barcode already exists.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for("add_medicine")
+                )
+
+        expiry_date = None
+
+        if expiry_date_text:
+
+            try:
+
+                expiry_date = datetime.strptime(
+                    expiry_date_text,
+                    "%Y-%m-%d"
+                ).date()
+
+            except ValueError:
+
+                flash(
+                    "Invalid expiry date.",
                     "danger"
                 )
 
@@ -656,7 +692,7 @@ def add_medicine():
 
         medicine = Medicine(
             name=name,
-            category=category,
+            category=category or None,
             barcode=barcode or None,
             quantity=quantity,
             purchase_price=purchase_price,
@@ -664,17 +700,36 @@ def add_medicine():
             expiry_date=expiry_date
         )
 
-        db.session.add(medicine)
-        db.session.commit()
+        try:
 
-        log_activity(
-            f"Added medicine: {medicine.name}"
-        )
+            db.session.add(
+                medicine
+            )
 
-        flash(
-            "Medicine added successfully.",
-            "success"
-        )
+            db.session.commit()
+
+            log_activity(
+                f"Added medicine: {name}"
+            )
+
+            flash(
+                "Medicine added successfully.",
+                "success"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "ADD MEDICINE ERROR:",
+                repr(e)
+            )
+
+            flash(
+                "Could not add medicine.",
+                "danger"
+            )
 
         return redirect(
             url_for("medicines")
@@ -714,48 +769,45 @@ def edit_medicine(id):
 
     if request.method == "POST":
 
-        medicine.name = request.form.get(
+        name = request.form.get(
             "name",
             ""
         ).strip()
 
-        medicine.category = request.form.get(
+        category = request.form.get(
             "category",
             ""
         ).strip()
 
-        medicine.barcode = request.form.get(
+        barcode = request.form.get(
             "barcode",
             ""
-        ).strip() or None
+        ).strip()
 
-        try:
+        quantity_text = request.form.get(
+            "quantity",
+            "0"
+        )
 
-            medicine.quantity = int(
-                request.form.get(
-                    "quantity",
-                    0
-                )
-            )
+        purchase_price_text = request.form.get(
+            "purchase_price",
+            "0"
+        )
 
-            medicine.purchase_price = float(
-                request.form.get(
-                    "purchase_price",
-                    0
-                )
-            )
+        selling_price_text = request.form.get(
+            "selling_price",
+            "0"
+        )
 
-            medicine.selling_price = float(
-                request.form.get(
-                    "selling_price",
-                    0
-                )
-            )
+        expiry_date_text = request.form.get(
+            "expiry_date",
+            ""
+        ).strip()
 
-        except (TypeError, ValueError):
+        if not name:
 
             flash(
-                "Invalid medicine information.",
+                "Medicine name is required.",
                 "danger"
             )
 
@@ -766,17 +818,91 @@ def edit_medicine(id):
                 )
             )
 
-        expiry_value = request.form.get(
-            "expiry_date",
-            ""
-        ).strip()
+        try:
 
-        if expiry_value:
+            quantity = int(
+                quantity_text
+            )
+
+            purchase_price = float(
+                purchase_price_text
+            )
+
+            selling_price = float(
+                selling_price_text
+            )
+
+        except (TypeError, ValueError):
+
+            flash(
+                "Invalid quantity or price.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "edit_medicine",
+                    id=id
+                )
+            )
+
+        if quantity < 0:
+
+            flash(
+                "Quantity cannot be negative.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "edit_medicine",
+                    id=id
+                )
+            )
+
+        if purchase_price < 0 or selling_price < 0:
+
+            flash(
+                "Price cannot be negative.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "edit_medicine",
+                    id=id
+                )
+            )
+
+        if barcode:
+
+            existing_barcode = Medicine.query.filter(
+                Medicine.barcode == barcode,
+                Medicine.id != medicine.id
+            ).first()
+
+            if existing_barcode:
+
+                flash(
+                    "This barcode already exists.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for(
+                        "edit_medicine",
+                        id=id
+                    )
+                )
+
+        expiry_date = None
+
+        if expiry_date_text:
 
             try:
 
-                medicine.expiry_date = datetime.strptime(
-                    expiry_value,
+                expiry_date = datetime.strptime(
+                    expiry_date_text,
                     "%Y-%m-%d"
                 ).date()
 
@@ -794,38 +920,40 @@ def edit_medicine(id):
                     )
                 )
 
-        else:
-
-            medicine.expiry_date = None
+        medicine.name = name
+        medicine.category = category or None
+        medicine.barcode = barcode or None
+        medicine.quantity = quantity
+        medicine.purchase_price = purchase_price
+        medicine.selling_price = selling_price
+        medicine.expiry_date = expiry_date
 
         try:
 
             db.session.commit()
 
-        except Exception:
+            log_activity(
+                f"Updated medicine: {name}"
+            )
+
+            flash(
+                "Medicine updated successfully.",
+                "success"
+            )
+
+        except Exception as e:
 
             db.session.rollback()
+
+            print(
+                "EDIT MEDICINE ERROR:",
+                repr(e)
+            )
 
             flash(
                 "Could not update medicine.",
                 "danger"
             )
-
-            return redirect(
-                url_for(
-                    "edit_medicine",
-                    id=id
-                )
-            )
-
-        log_activity(
-            f"Edited medicine: {medicine.name}"
-        )
-
-        flash(
-            "Medicine updated successfully.",
-            "success"
-        )
 
         return redirect(
             url_for("medicines")
@@ -864,10 +992,13 @@ def delete_medicine(id):
             url_for("medicines")
         )
 
-    # A medicine with existing sales cannot be deleted.
-    if Sale.query.filter_by(
+    # Do not allow deleting medicine
+    # if it has sales history.
+    existing_sale = Sale.query.filter_by(
         medicine_id=medicine.id
-    ).first():
+    ).first()
+
+    if existing_sale:
 
         flash(
             "This medicine cannot be deleted.",
@@ -880,20 +1011,36 @@ def delete_medicine(id):
 
     medicine_name = medicine.name
 
-    db.session.delete(
-        medicine
-    )
+    try:
 
-    db.session.commit()
+        db.session.delete(
+            medicine
+        )
 
-    log_activity(
-        f"Deleted medicine: {medicine_name}"
-    )
+        db.session.commit()
 
-    flash(
-        "Medicine deleted successfully.",
-        "success"
-    )
+        log_activity(
+            f"Deleted medicine: {medicine_name}"
+        )
+
+        flash(
+            "Medicine deleted successfully.",
+            "success"
+        )
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        print(
+            "DELETE MEDICINE ERROR:",
+            repr(e)
+        )
+
+        flash(
+            "Could not delete medicine.",
+            "danger"
+        )
 
     return redirect(
         url_for("medicines")
@@ -999,7 +1146,6 @@ def sales():
             medicine.selling_price * quantity
         )
 
-        # Decrease stock
         medicine.quantity -= quantity
 
         sale = Sale(
@@ -1009,17 +1155,36 @@ def sales():
             sold_by=current_user.id
         )
 
-        db.session.add(sale)
-        db.session.commit()
+        try:
 
-        log_activity(
-            f"Sold {quantity} x {medicine.name}"
-        )
+            db.session.add(
+                sale
+            )
 
-        flash(
-            "Sale completed successfully.",
-            "success"
-        )
+            db.session.commit()
+
+            log_activity(
+                f"Sold {quantity} x {medicine.name}"
+            )
+
+            flash(
+                "Sale completed successfully.",
+                "success"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "CREATE SALE ERROR:",
+                repr(e)
+            )
+
+            flash(
+                "Could not complete sale.",
+                "danger"
+            )
 
         return redirect(
             url_for("sales")
@@ -1062,10 +1227,8 @@ def sales():
             .all()
         )
 
-    # IMPORTANT:
-    # Convert SQLAlchemy objects to simple dictionaries.
-    # This prevents the Jinja tojson error in sales.html.
-
+    # Convert SQLAlchemy objects
+    # into JSON-safe dictionaries.
     medicines_json = []
 
     for medicine in medicines_list:
@@ -1136,35 +1299,73 @@ def delete_sale(id):
         sale.medicine_id
     )
 
-    sale_quantity = sale.quantity
+    sale_quantity = int(
+        sale.quantity or 0
+    )
 
+    medicine_name = (
+        medicine.name
+        if medicine
+        else "Unknown medicine"
+    )
+
+    # Return the sold quantity to stock.
     if medicine:
 
-        # Return sold quantity to stock
-        medicine.quantity += sale.quantity
+        medicine.quantity = (
+            int(medicine.quantity or 0)
+            + sale_quantity
+        )
 
-        medicine_name = medicine.name
-
-    else:
-
-        medicine_name = "Unknown medicine"
-
-    db.session.delete(
-        sale
-    )
-
-    db.session.commit()
-
-    log_activity(
+    activity_text = (
         f"Deleted sale record: "
-        f"{sale_quantity} x {medicine_name}"
+        f"{sale_quantity} x "
+        f"{medicine_name}"
     )
 
-    flash(
-        "Sale record deleted successfully. "
-        "The quantity was returned to stock.",
-        "success"
-    )
+    user_id = current_user.id
+
+    try:
+
+        # Delete sale first.
+        db.session.delete(
+            sale
+        )
+
+        # Make sure the delete is processed
+        # before creating the activity log.
+        db.session.flush()
+
+        # Add activity log in the same transaction.
+        db.session.add(
+            ActivityLog(
+                user_id=user_id,
+                action=activity_text
+            )
+        )
+
+        # Commit everything together.
+        db.session.commit()
+
+        flash(
+            "Sale record deleted successfully. "
+            "The quantity was returned to stock.",
+            "success"
+        )
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        print(
+            "DELETE SALE ERROR:",
+            repr(e)
+        )
+
+        flash(
+            "Could not delete sale record.",
+            "danger"
+        )
 
     return redirect(
         url_for("sales")
@@ -1210,7 +1411,7 @@ def users():
 
 @app.route(
     "/users/add",
-    methods=["POST"]
+    methods=["GET", "POST"]
 )
 @login_required
 def add_user():
@@ -1226,75 +1427,113 @@ def add_user():
             url_for("index")
         )
 
-    username = request.form.get(
-        "username",
-        ""
-    ).strip()
+    if request.method == "POST":
 
-    password = request.form.get(
-        "password",
-        ""
-    )
+        username = request.form.get(
+            "username",
+            ""
+        ).strip()
 
-    role = request.form.get(
-        "role",
-        "staff"
-    )
-
-    if not username or not password:
-
-        flash(
-            "Username and password are required.",
-            "danger"
+        password = request.form.get(
+            "password",
+            ""
         )
+
+        role = request.form.get(
+            "role",
+            "staff"
+        ).strip().lower()
+
+        if not username:
+
+            flash(
+                "Username is required.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("add_user")
+            )
+
+        if not password:
+
+            flash(
+                "Password is required.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("add_user")
+            )
+
+        if role not in [
+            "admin",
+            "staff"
+        ]:
+
+            role = "staff"
+
+        existing_user = User.query.filter_by(
+            username=username
+        ).first()
+
+        if existing_user:
+
+            flash(
+                "Username already exists.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("add_user")
+            )
+
+        user = User(
+            username=username,
+            role=role
+        )
+
+        user.set_password(
+            password
+        )
+
+        try:
+
+            db.session.add(
+                user
+            )
+
+            db.session.commit()
+
+            log_activity(
+                f"Added user: {username}"
+            )
+
+            flash(
+                "User added successfully.",
+                "success"
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "ADD USER ERROR:",
+                repr(e)
+            )
+
+            flash(
+                "Could not add user.",
+                "danger"
+            )
 
         return redirect(
             url_for("users")
         )
 
-    if User.query.filter_by(
-        username=username
-    ).first():
-
-        flash(
-            "Username already exists.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("users")
-        )
-
-    if role not in [
-        "admin",
-        "staff"
-    ]:
-
-        role = "staff"
-
-    user = User(
-        username=username,
-        role=role
-    )
-
-    user.set_password(
-        password
-    )
-
-    db.session.add(user)
-    db.session.commit()
-
-    log_activity(
-        f"Created user: {username}"
-    )
-
-    flash(
-        "User created successfully.",
-        "success"
-    )
-
-    return redirect(
-        url_for("users")
+    return render_template(
+        "add_user.html"
     )
 
 
@@ -1336,6 +1575,7 @@ def delete_user(id):
             url_for("users")
         )
 
+    # Prevent deleting yourself.
     if user.id == current_user.id:
 
         flash(
@@ -1347,12 +1587,11 @@ def delete_user(id):
             url_for("users")
         )
 
-    if Sale.query.filter_by(
-        sold_by=user.id
-    ).first():
+    # Prevent deleting admin account.
+    if user.username == "admin":
 
         flash(
-            "This user has sales records and cannot be deleted.",
+            "The main admin account cannot be deleted.",
             "warning"
         )
 
@@ -1362,20 +1601,53 @@ def delete_user(id):
 
     username = user.username
 
-    db.session.delete(
-        user
-    )
+    try:
 
-    db.session.commit()
+        # Check if user has sales history.
+        user_sales = Sale.query.filter_by(
+            sold_by=user.id
+        ).first()
 
-    log_activity(
-        f"Deleted user: {username}"
-    )
+        if user_sales:
 
-    flash(
-        "User deleted successfully.",
-        "success"
-    )
+            flash(
+                "This user cannot be deleted because "
+                "they have sales history.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("users")
+            )
+
+        db.session.delete(
+            user
+        )
+
+        db.session.commit()
+
+        log_activity(
+            f"Deleted user: {username}"
+        )
+
+        flash(
+            "User deleted successfully.",
+            "success"
+        )
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        print(
+            "DELETE USER ERROR:",
+            repr(e)
+        )
+
+        flash(
+            "Could not delete user.",
+            "danger"
+        )
 
     return redirect(
         url_for("users")
@@ -1433,16 +1705,22 @@ def internal_error(error):
 
     db.session.rollback()
 
+    print(
+        "500 ERROR:",
+        repr(error)
+    )
+
     return render_template(
         "500.html"
     ), 500
 
 
 # =========================================================
-# DATABASE STARTUP
+# INITIALIZE DATABASE
 # =========================================================
 
 with app.app_context():
+
     initialize_database()
 
 
