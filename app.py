@@ -16,19 +16,18 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
-
-# =========================================================
-# ENVIRONMENT
-# =========================================================
-
 load_dotenv()
+
+
+# =========================
+# CONFIG
+# =========================
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 if not SECRET_KEY:
-    raise RuntimeError(
-        "SECRET_KEY environment variable is missing."
-    )
+    raise RuntimeError("SECRET_KEY environment variable is missing.")
+
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -36,12 +35,7 @@ if not DATABASE_URL:
     DATABASE_URL = "sqlite:///pharmacy.db"
 
 
-# =========================================================
-# POSTGRESQL DRIVER FIX
-# =========================================================
-
 if DATABASE_URL.startswith("postgres://"):
-
     DATABASE_URL = DATABASE_URL.replace(
         "postgres://",
         "postgresql+psycopg://",
@@ -49,7 +43,6 @@ if DATABASE_URL.startswith("postgres://"):
     )
 
 elif DATABASE_URL.startswith("postgresql+psycopg2://"):
-
     DATABASE_URL = DATABASE_URL.replace(
         "postgresql+psycopg2://",
         "postgresql+psycopg://",
@@ -57,7 +50,6 @@ elif DATABASE_URL.startswith("postgresql+psycopg2://"):
     )
 
 elif DATABASE_URL.startswith("postgresql://"):
-
     DATABASE_URL = DATABASE_URL.replace(
         "postgresql://",
         "postgresql+psycopg://",
@@ -65,49 +57,30 @@ elif DATABASE_URL.startswith("postgresql://"):
     )
 
 
-# =========================================================
-# FLASK APP
-# =========================================================
-
 app = Flask(__name__)
 
 app.config["SECRET_KEY"] = SECRET_KEY
-
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
-
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True
 }
 
-
-# =========================================================
-# SESSION SECURITY
-# =========================================================
-
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 app.config["SESSION_COOKIE_SECURE"] = (
-    os.getenv(
-        "SESSION_COOKIE_SECURE",
-        "false"
-    ).lower() == "true"
+    os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
 )
 
-
-# =========================================================
-# DATABASE
-# =========================================================
 
 db = SQLAlchemy(app)
 
 
-# =========================================================
-# LOGIN MANAGER
-# =========================================================
+# =========================
+# LOGIN
+# =========================
 
 login_manager = LoginManager()
 
@@ -115,16 +88,14 @@ login_manager.init_app(app)
 
 login_manager.login_view = "login"
 
-login_manager.login_message = (
-    "Please log in to access this page."
-)
+login_manager.login_message = "Please log in to access this page."
 
 login_manager.login_message_category = "warning"
 
 
-# =========================================================
-# USER MODEL
-# =========================================================
+# =========================
+# MODELS
+# =========================
 
 class User(UserMixin, db.Model):
 
@@ -188,10 +159,6 @@ class User(UserMixin, db.Model):
         return self.is_active_user
 
 
-# =========================================================
-# MEDICINE MODEL
-# =========================================================
-
 class Medicine(db.Model):
 
     __tablename__ = "medicines"
@@ -247,10 +214,6 @@ class Medicine(db.Model):
     )
 
 
-# =========================================================
-# SALE MODEL
-# =========================================================
-
 class Sale(db.Model):
 
     __tablename__ = "sales"
@@ -288,10 +251,6 @@ class Sale(db.Model):
     )
 
 
-# =========================================================
-# ACTIVITY LOG MODEL
-# =========================================================
-
 class ActivityLog(db.Model):
 
     __tablename__ = "activity_logs"
@@ -317,9 +276,9 @@ class ActivityLog(db.Model):
     )
 
 
-# =========================================================
-# LOGIN USER LOADER
-# =========================================================
+# =========================
+# LOGIN MANAGER
+# =========================
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -336,9 +295,9 @@ def load_user(user_id):
         return None
 
 
-# =========================================================
+# =========================
 # ACTIVITY LOG
-# =========================================================
+# =========================
 
 def log_activity(action):
 
@@ -361,9 +320,9 @@ def log_activity(action):
         db.session.rollback()
 
 
-# =========================================================
-# ADMIN DECORATOR
-# =========================================================
+# =========================
+# ADMIN REQUIRED
+# =========================
 
 def admin_required(function):
 
@@ -387,18 +346,13 @@ def admin_required(function):
     return decorated_function
 
 
-# =========================================================
-# HOME / DASHBOARD
-# =========================================================
+# =========================
+# DASHBOARD
+# =========================
 
 @app.route("/")
+@login_required
 def index():
-
-    if not current_user.is_authenticated:
-
-        return redirect(
-            url_for("medicines")
-        )
 
     medicine_count = Medicine.query.count()
 
@@ -422,18 +376,34 @@ def index():
         db.func.date(Sale.sale_date) == today
     ).scalar()
 
+    low_stock = Medicine.query.filter(
+        Medicine.quantity <= 10
+    ).count()
+
+    expiring_soon = Medicine.query.filter(
+        Medicine.expiry_date.isnot(None),
+        Medicine.expiry_date <= today
+    ).count()
+
+    recent_sales = Sale.query.order_by(
+        Sale.sale_date.desc()
+    ).limit(5).all()
+
     return render_template(
         "index.html",
-        medicine_count=medicine_count,
+        total_medicines=medicine_count,
         total_stock=total_stock,
         sales_count=sales_count,
-        today_sales=today_sales
+        today_sales=today_sales,
+        low_stock=low_stock,
+        expiring_soon=expiring_soon,
+        recent_sales=recent_sales
     )
 
 
-# =========================================================
+# =========================
 # LOGIN
-# =========================================================
+# =========================
 
 @app.route(
     "/login",
@@ -478,9 +448,7 @@ def login():
 
             login_user(user)
 
-            log_activity(
-                "Logged in"
-            )
+            log_activity("Logged in")
 
             return redirect(
                 url_for("index")
@@ -496,17 +464,15 @@ def login():
     )
 
 
-# =========================================================
+# =========================
 # LOGOUT
-# =========================================================
+# =========================
 
 @app.route("/logout")
 @login_required
 def logout():
 
-    log_activity(
-        "Logged out"
-    )
+    log_activity("Logged out")
 
     logout_user()
 
@@ -515,9 +481,9 @@ def logout():
     )
 
 
-# =========================================================
-# PUBLIC MEDICINE LIST
-# =========================================================
+# =========================
+# MEDICINES
+# =========================
 
 @app.route("/medicines")
 def medicines():
@@ -534,9 +500,11 @@ def medicines():
                 Medicine.name.ilike(
                     f"%{search}%"
                 ),
+
                 Medicine.barcode.ilike(
                     f"%{search}%"
                 ),
+
                 Medicine.category.ilike(
                     f"%{search}%"
                 )
@@ -558,9 +526,9 @@ def medicines():
     )
 
 
-# =========================================================
+# =========================
 # ADD MEDICINE
-# =========================================================
+# =========================
 
 @app.route(
     "/medicines/add",
@@ -727,9 +695,9 @@ def add_medicine():
     )
 
 
-# =========================================================
+# =========================
 # EDIT MEDICINE
-# =========================================================
+# =========================
 
 @app.route(
     "/medicines/edit/<int:id>",
@@ -917,9 +885,9 @@ def edit_medicine(id):
     )
 
 
-# =========================================================
+# =========================
 # DELETE MEDICINE
-# =========================================================
+# =========================
 
 @app.route(
     "/medicines/delete/<int:id>",
@@ -964,18 +932,37 @@ def delete_medicine(id):
     )
 
 
-# =========================================================
+# =========================
 # SALES
-# =========================================================
+# =========================
 
 @app.route(
     "/sales",
     methods=["GET", "POST"]
 )
-@login_required
 def sales():
 
+    search = request.args.get(
+        "search",
+        ""
+    ).strip()
+
+    # -------------------------
+    # CREATE SALE
+    # -------------------------
+
     if request.method == "POST":
+
+        if not current_user.is_authenticated:
+
+            flash(
+                "Please log in to make a sale.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("login")
+            )
 
         try:
 
@@ -1070,24 +1057,55 @@ def sales():
             url_for("sales")
         )
 
-    medicines_list = Medicine.query.order_by(
-        Medicine.name
-    ).all()
+    # -------------------------
+    # MEDICINE SEARCH
+    # -------------------------
 
-    sales_list = Sale.query.order_by(
+    if search:
+
+        medicines_list = Medicine.query.filter(
+            db.or_(
+                Medicine.name.ilike(
+                    f"%{search}%"
+                ),
+
+                Medicine.barcode.ilike(
+                    f"%{search}%"
+                ),
+
+                Medicine.category.ilike(
+                    f"%{search}%"
+                )
+            )
+        ).order_by(
+            Medicine.name
+        ).all()
+
+    else:
+
+        medicines_list = Medicine.query.order_by(
+            Medicine.name
+        ).all()
+
+    # -------------------------
+    # RECENT SALES
+    # -------------------------
+
+    recent_sales = Sale.query.order_by(
         Sale.sale_date.desc()
-    ).all()
+    ).limit(10).all()
 
     return render_template(
         "sales.html",
         medicines=medicines_list,
-        sales=sales_list
+        recent_sales=recent_sales,
+        search=search
     )
 
 
-# =========================================================
+# =========================
 # USERS
-# =========================================================
+# =========================
 
 @app.route("/users")
 @admin_required
@@ -1103,9 +1121,9 @@ def users():
     )
 
 
-# =========================================================
+# =========================
 # ADD USER
-# =========================================================
+# =========================
 
 @app.route(
     "/users/add",
@@ -1131,7 +1149,10 @@ def add_user():
             "staff"
         )
 
-        if role not in ["admin", "staff"]:
+        if role not in [
+            "admin",
+            "staff"
+        ]:
 
             role = "staff"
 
@@ -1203,9 +1224,9 @@ def add_user():
     )
 
 
-# =========================================================
+# =========================
 # TOGGLE USER
-# =========================================================
+# =========================
 
 @app.route(
     "/users/toggle/<int:id>",
@@ -1230,9 +1251,7 @@ def toggle_user(id):
             url_for("users")
         )
 
-    user.is_active_user = (
-        not user.is_active_user
-    )
+    user.is_active_user = not user.is_active_user
 
     db.session.commit()
 
@@ -1256,9 +1275,9 @@ def toggle_user(id):
     )
 
 
-# =========================================================
+# =========================
 # ACTIVITY LOGS
-# =========================================================
+# =========================
 
 @app.route("/logs")
 @admin_required
@@ -1274,9 +1293,9 @@ def logs():
     )
 
 
-# =========================================================
+# =========================
 # DATABASE INITIALIZATION
-# =========================================================
+# =========================
 
 def initialize_database():
 
@@ -1284,18 +1303,11 @@ def initialize_database():
 
         db.create_all()
 
-        # -------------------------------------------------
-        # Find existing admin
-        # -------------------------------------------------
-
         admin = User.query.filter_by(
             username="admin"
         ).first()
 
-        # -------------------------------------------------
-        # Create admin if it does not exist
-        # -------------------------------------------------
-
+        # Create admin if it doesn't exist
         if admin is None:
 
             initial_password = os.getenv(
@@ -1305,8 +1317,7 @@ def initialize_database():
             if not initial_password:
 
                 raise RuntimeError(
-                    "INITIAL_ADMIN_PASSWORD "
-                    "environment variable is missing."
+                    "INITIAL_ADMIN_PASSWORD environment variable is missing."
                 )
 
             admin = User(
@@ -1326,13 +1337,11 @@ def initialize_database():
                 "Initial admin account created."
             )
 
-        # -------------------------------------------------
         # Optional one-time password reset
-        # -------------------------------------------------
-
         reset_password = os.getenv(
-            "RESET_ADMIN_PASSWORD"
-        )
+            "RESET_ADMIN_PASSWORD",
+            ""
+        ).strip()
 
         if reset_password:
 
@@ -1343,20 +1352,16 @@ def initialize_database():
             db.session.commit()
 
             print(
-                "Admin password has been reset."
+                "ADMIN PASSWORD RESET SUCCESS"
             )
 
 
-# =========================================================
-# STARTUP
-# =========================================================
+# =========================
+# START
+# =========================
 
 initialize_database()
 
-
-# =========================================================
-# LOCAL DEVELOPMENT
-# =========================================================
 
 if __name__ == "__main__":
 
