@@ -387,29 +387,36 @@ def admin_required(function):
 def index():
 
     if not current_user.is_authenticated:
-
-        return redirect(
-            url_for("medicines")
-        )
+        return redirect(url_for("medicines"))
 
     medicine_count = Medicine.query.count()
 
     total_stock = db.session.query(
         db.func.coalesce(
-            db.func.sum(
-                Medicine.quantity
-            ),
+            db.func.sum(Medicine.quantity),
             0
         )
     ).scalar()
 
     sales_count = Sale.query.count()
 
+    today = datetime.utcnow().date()
+
+    today_sales = db.session.query(
+        db.func.coalesce(
+            db.func.sum(Sale.total_price),
+            0
+        )
+    ).filter(
+        db.func.date(Sale.sale_date) == today
+    ).scalar()
+
     return render_template(
         "index.html",
         medicine_count=medicine_count,
         total_stock=total_stock,
-        sales_count=sales_count
+        sales_count=sales_count,
+        today_sales=today_sales
     )
 
 
