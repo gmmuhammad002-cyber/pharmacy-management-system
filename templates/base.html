@@ -4,117 +4,158 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>{% block title %}Pharmacy Management System{% endblock %}</title>
+    <title>
+        {% block title %}Pharmacy Management System{% endblock %}
+    </title>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
 </head>
 
 <body>
 
-    <nav class="navbar">
-        <div class="nav-container">
+<nav class="navbar">
 
-            <a href="{{ url_for('index') }}" class="brand">
-                Pharmacy Management
+    <!-- BRAND -->
+    <a href="{{ url_for('medicines') }}" class="nav-brand">
+
+        <span class="brand-icon">💊</span>
+
+        <span>
+            Pharmacy <strong>Care</strong>
+        </span>
+
+    </a>
+
+
+    <!-- NAVIGATION -->
+    <div class="nav-links">
+
+        <!-- PUBLIC LINKS -->
+        <a href="{{ url_for('medicines') }}">
+            Medicines
+        </a>
+
+        <a href="{{ url_for('orders') }}">
+            Orders
+        </a>
+
+
+        <!-- LOGGED-IN LINKS -->
+        {% if current_user.is_authenticated %}
+
+            <a href="{{ url_for('dashboard') }}">
+                Dashboard
             </a>
 
-            <div class="nav-links">
+            <a href="{{ url_for('sales') }}">
+                Sales
+            </a>
 
-                {% if current_user.is_authenticated %}
-
-                    <a href="{{ url_for('index') }}">
-                        Dashboard
-                    </a>
-
-                    <a href="{{ url_for('medicines') }}">
-                        Medicines
-                    </a>
-
-                    <a href="{{ url_for('add_medicine') }}">
-                        Add Medicine
-                    </a>
-
-                    <a href="{{ url_for('sales') }}">
-                        Sales
-                    </a>
-
-                    <a href="{{ url_for('orders') }}">
-                        Orders
-                    </a>
-
-                    {% if current_user.role == "admin" %}
-
-                        <a href="{{ url_for('users') }}">
-                            Users
-                        </a>
-
-                        <a href="{{ url_for('logs') }}">
-                            Activity Logs
-                        </a>
-
-                    {% endif %}
-
-                    <span class="nav-user">
-                        {{ current_user.username }}
-                        <small>({{ current_user.role }})</small>
-                    </span>
-
-                    <a href="{{ url_for('logout') }}" class="logout-link">
-                        Logout
-                    </a>
-
-                {% else %}
-
-                    <a href="{{ url_for('login') }}" class="login-link">
-                        Admin Login
-                    </a>
-
-                {% endif %}
-
-            </div>
-        </div>
-    </nav>
+            <a href="{{ url_for('add_medicine') }}">
+                Add Medicine
+            </a>
 
 
-    <main class="main-container">
+            {% if current_user.role == "admin" %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
+                <a href="{{ url_for('users') }}">
+                    Users
+                </a>
 
-            {% if messages %}
-
-                <div class="flash-container">
-
-                    {% for category, message in messages %}
-
-                        <div class="flash-message {{ category }}">
-                            {{ message }}
-                        </div>
-
-                    {% endfor %}
-
-                </div>
+                <a href="{{ url_for('logs') }}">
+                    Activity Logs
+                </a>
 
             {% endif %}
 
-        {% endwith %}
+        {% endif %}
+
+    </div>
 
 
-        {% block content %}
-        {% endblock %}
+    <!-- RIGHT SIDE -->
+    <div class="nav-actions">
 
-    </main>
+        {% if current_user.is_authenticated %}
+
+            <div class="nav-user">
+
+                <div class="user-info">
+
+                    <div class="user-avatar">
+                        👤
+                    </div>
+
+                    <div>
+                        <strong>
+                            {{ current_user.username }}
+                        </strong>
+
+                        <small>
+                            {{ current_user.role }}
+                        </small>
+                    </div>
+
+                </div>
 
 
-    <footer class="footer">
-        <p>
-            &copy; {{ now().year if now is defined else 2026 }}
-            Pharmacy Management System
-        </p>
-    </footer>
+                <a
+                    href="{{ url_for('logout') }}"
+                    class="logout-link"
+                >
+                    Logout
+                </a>
+
+            </div>
+
+        {% else %}
+
+            <span class="public-label">
+                Public
+            </span>
+
+            <a
+                href="{{ url_for('login') }}"
+                class="login-link"
+            >
+                Admin Login
+            </a>
+
+        {% endif %}
+
+    </div>
+
+</nav>
 
 
-    {% block scripts %}
-    {% endblock %}
+<!-- FLASH MESSAGES -->
+<div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+
+        {% if messages %}
+
+            {% for category, message in messages %}
+
+                <div class="alert {{ category }}">
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <!-- PAGE CONTENT -->
+    {% block content %}{% endblock %}
+
+</div>
+
 
 </body>
 </html>
