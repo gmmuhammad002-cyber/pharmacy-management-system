@@ -33,12 +33,14 @@ if database_url.startswith("postgres://"):
         "postgresql+psycopg://",
         1
     )
+
 elif database_url.startswith("postgresql://"):
     database_url = database_url.replace(
         "postgresql://",
         "postgresql+psycopg://",
         1
     )
+
 elif database_url.startswith("postgresql+psycopg2://"):
     database_url = database_url.replace(
         "postgresql+psycopg2://",
@@ -62,7 +64,10 @@ login_manager.login_view = "login"
 
 class User(UserMixin, db.Model):
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     username = db.Column(
         db.String(80),
@@ -304,7 +309,11 @@ class ActivityLog(db.Model):
 def load_user(user_id):
 
     try:
-        return db.session.get(User, int(user_id))
+        return db.session.get(
+            User,
+            int(user_id)
+        )
+
     except Exception:
         return None
 
@@ -376,7 +385,9 @@ def initialize_database():
                 role="admin"
             )
 
-            admin.set_password(initial_password)
+            admin.set_password(
+                initial_password
+            )
 
             db.session.add(admin)
             db.session.commit()
@@ -390,7 +401,9 @@ def initialize_database():
 
         if reset_password:
 
-            admin.set_password(reset_password)
+            admin.set_password(
+                reset_password
+            )
 
             db.session.commit()
 
@@ -447,7 +460,10 @@ def index():
         Medicine.quantity <= 10
     ).count()
 
-    expiring_date = date.today() + timedelta(days=30)
+    expiring_date = (
+        date.today() +
+        timedelta(days=30)
+    )
 
     expiring_soon = Medicine.query.filter(
         Medicine.expiry_date.isnot(None),
@@ -480,11 +496,16 @@ def index():
 # LOGIN
 # =========================================================
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
 def login():
 
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+        return redirect(
+            url_for("index")
+        )
 
     if request.method == "POST":
 
@@ -548,13 +569,33 @@ def logout():
 @app.route("/medicines")
 def medicines():
 
-    medicines = Medicine.query.order_by(
+    search = request.args.get(
+        "search",
+        ""
+    ).strip()
+
+    query = Medicine.query
+
+    if search:
+
+        search_term = f"%{search}%"
+
+        query = query.filter(
+            db.or_(
+                Medicine.name.ilike(search_term),
+                Medicine.barcode.ilike(search_term),
+                Medicine.category.ilike(search_term)
+            )
+        )
+
+    medicines = query.order_by(
         Medicine.name.asc()
     ).all()
 
     return render_template(
         "medicines.html",
-        medicines=medicines
+        medicines=medicines,
+        search=search
     )
 
 
@@ -610,14 +651,40 @@ def add_medicine():
 
         try:
 
-            price = float(price_raw)
+            price = float(
+                price_raw
+            )
 
-            quantity = int(quantity_raw)
+            quantity = int(
+                quantity_raw
+            )
 
         except ValueError:
 
             flash(
                 "Price and quantity must be valid numbers.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("add_medicine")
+            )
+
+        if price < 0:
+
+            flash(
+                "Price cannot be negative.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("add_medicine")
+            )
+
+        if quantity < 0:
+
+            flash(
+                "Quantity cannot be negative.",
                 "danger"
             )
 
@@ -749,16 +816,62 @@ def edit_medicine(id):
             ""
         )
 
+        if not name:
+
+            flash(
+                "Medicine name is required.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "edit_medicine",
+                    id=id
+                )
+            )
+
         try:
 
-            price = float(price_raw)
+            price = float(
+                price_raw
+            )
 
-            quantity = int(quantity_raw)
+            quantity = int(
+                quantity_raw
+            )
 
         except ValueError:
 
             flash(
                 "Price and quantity must be valid numbers.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "edit_medicine",
+                    id=id
+                )
+            )
+
+        if price < 0:
+
+            flash(
+                "Price cannot be negative.",
+                "danger"
+            )
+
+            return redirect(
+                url_for(
+                    "edit_medicine",
+                    id=id
+                )
+            )
+
+        if quantity < 0:
+
+            flash(
+                "Quantity cannot be negative.",
                 "danger"
             )
 
@@ -926,10 +1039,6 @@ def delete_medicine(id):
 @login_required
 def sales():
 
-    medicines = Medicine.query.order_by(
-        Medicine.name.asc()
-    ).all()
-
     if request.method == "POST":
 
         medicine_id_raw = request.form.get(
@@ -952,7 +1061,7 @@ def sales():
                 quantity_raw
             )
 
-        except ValueError:
+        except (ValueError, TypeError):
 
             flash(
                 "Please select a medicine and enter a valid quantity.",
@@ -1002,7 +1111,8 @@ def sales():
             )
 
         total_price = (
-            float(medicine.price) * quantity
+            float(medicine.price) *
+            quantity
         )
 
         medicine.quantity -= quantity
@@ -1015,7 +1125,6 @@ def sales():
         )
 
         db.session.add(sale)
-
         db.session.commit()
 
         log_activity(
@@ -1030,6 +1139,35 @@ def sales():
         return redirect(
             url_for("sales")
         )
+
+    # -----------------------------------------------------
+    # Convert Medicine objects to JSON-safe dictionaries
+    # -----------------------------------------------------
+
+    medicine_records = Medicine.query.order_by(
+        Medicine.name.asc()
+    ).all()
+
+    medicines = []
+
+    for medicine in medicine_records:
+
+        medicines.append({
+            "id": medicine.id,
+            "name": medicine.name,
+            "barcode": medicine.barcode or "",
+            "category": medicine.category or "",
+            "price": float(
+                medicine.price or 0
+            ),
+            "quantity": int(
+                medicine.quantity or 0
+            )
+        })
+
+    # -----------------------------------------------------
+    # Recent sales
+    # -----------------------------------------------------
 
     recent_sales = Sale.query.order_by(
         Sale.created_at.desc()
@@ -1207,7 +1345,7 @@ def orders():
                 quantity_raw
             )
 
-        except ValueError:
+        except (ValueError, TypeError):
 
             flash(
                 "Please select a medicine and enter a valid quantity.",
@@ -1261,7 +1399,8 @@ def orders():
         )
 
         total_price = (
-            unit_price * quantity
+            unit_price *
+            quantity
         )
 
         order = Order(
@@ -1303,7 +1442,10 @@ def orders():
 
     all_orders = []
 
-    if current_user.is_authenticated and admin_required():
+    if (
+        current_user.is_authenticated
+        and admin_required()
+    ):
 
         all_orders = Order.query.order_by(
             Order.created_at.desc()
@@ -1414,10 +1556,6 @@ def update_order_status(id):
                 )
 
                 medicine.quantity -= item.quantity
-
-        # Cancelled -> Pending
-        # No stock change because cancelled orders
-        # never reduced stock.
 
         order.status = new_status
 
@@ -1555,7 +1693,9 @@ def add_user():
             role=role
         )
 
-        user.set_password(password)
+        user.set_password(
+            password
+        )
 
         db.session.add(user)
 
@@ -1688,7 +1828,10 @@ def page_not_found(error):
 @app.errorhandler(500)
 def internal_server_error(error):
 
-    db.session.rollback()
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
 
     return render_template(
         "500.html"
