@@ -60,12 +60,14 @@
         </button>
 
         {% if search %}
+
             <a
                 href="{{ url_for('medicines') }}"
                 class="btn btn-light"
             >
                 Clear
             </a>
+
         {% endif %}
 
     </form>
@@ -80,11 +82,13 @@
         <div class="table-header">
 
             <div>
+
                 <h2>Medicine Inventory</h2>
 
                 <p>
                     {{ medicines|length }} medicine(s) found
                 </p>
+
             </div>
 
         </div>
@@ -95,19 +99,27 @@
             <table>
 
                 <thead>
+
                     <tr>
+
                         <th>Medicine</th>
+
                         <th>Barcode</th>
+
                         <th>Category</th>
+
                         <th>Stock</th>
-                        <th>Purchase</th>
+
                         <th>Selling</th>
+
                         <th>Expiry</th>
 
                         {% if current_user.is_authenticated %}
                             <th>Actions</th>
                         {% endif %}
+
                     </tr>
+
                 </thead>
 
 
@@ -118,27 +130,37 @@
                     <tr>
 
                         <td>
+
                             <div class="medicine-name">
-                                <span class="medicine-icon">💊</span>
+
+                                <span class="medicine-icon">
+                                    💊
+                                </span>
 
                                 <strong>
                                     {{ medicine.name }}
                                 </strong>
+
                             </div>
+
                         </td>
 
 
                         <td>
+
                             <span class="barcode">
                                 {{ medicine.barcode }}
                             </span>
+
                         </td>
 
 
                         <td>
+
                             <span class="category-badge">
                                 {{ medicine.category }}
                             </span>
+
                         </td>
 
 
@@ -168,21 +190,20 @@
 
 
                         <td>
-                            {{ "%.2f"|format(medicine.purchase_price|float) }}
-                        </td>
 
-
-                        <td>
                             <strong class="selling-price">
                                 {{ "%.2f"|format(medicine.selling_price|float) }}
                             </strong>
+
                         </td>
 
 
                         <td>
+
                             <span class="expiry-date">
                                 {{ medicine.expiry_date }}
                             </span>
+
                         </td>
 
 
@@ -235,6 +256,7 @@
 
         </div>
 
+
     {% else %}
 
         <div class="empty-state">
@@ -242,6 +264,7 @@
             <div class="empty-icon">
                 💊
             </div>
+
 
             {% if search %}
 
@@ -258,6 +281,7 @@
                 >
                     Clear Search
                 </a>
+
 
             {% else %}
 
@@ -290,17 +314,25 @@
 <div class="legend">
 
     <div>
-        <span class="badge badge-success">Stock</span>
+        <span class="badge badge-success">
+            Stock
+        </span>
         Available
     </div>
 
+
     <div>
-        <span class="badge badge-warning">Low stock</span>
+        <span class="badge badge-warning">
+            Low stock
+        </span>
         10 or fewer
     </div>
 
+
     <div>
-        <span class="badge badge-danger">Out of stock</span>
+        <span class="badge badge-danger">
+            Out of stock
+        </span>
         0
     </div>
 
