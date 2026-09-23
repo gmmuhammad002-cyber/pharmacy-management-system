@@ -97,11 +97,13 @@ Dashboard - Pharmacy Management System
 <div class="dashboard-section">
 
     <div class="section-header">
+
         <h2>Recent Sales</h2>
 
         <a href="{{ url_for('sales') }}" class="btn btn-primary">
             View All Sales
         </a>
+
     </div>
 
     {% if recent_sales %}
@@ -111,6 +113,7 @@ Dashboard - Pharmacy Management System
         <table class="data-table">
 
             <thead>
+
                 <tr>
                     <th>Medicine</th>
                     <th>Quantity</th>
@@ -118,6 +121,7 @@ Dashboard - Pharmacy Management System
                     <th>Sold By</th>
                     <th>Date</th>
                 </tr>
+
             </thead>
 
             <tbody>
@@ -161,9 +165,13 @@ Dashboard - Pharmacy Management System
     {% else %}
 
     <div class="empty-state">
+
         <div class="empty-icon">🛒</div>
+
         <h3>No Recent Sales</h3>
+
         <p>There are no sales recorded yet.</p>
+
     </div>
 
     {% endif %}

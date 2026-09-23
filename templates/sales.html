@@ -14,6 +14,7 @@
 <div class="sales-layout">
 
     <!-- NEW SALE -->
+
     <div class="form-card">
 
         <h2>New Sale</h2>
@@ -21,7 +22,10 @@
         <form method="POST" id="saleForm">
 
             <div class="form-group">
-                <label for="medicineSearch">Medicine</label>
+
+                <label for="medicineSearch">
+                    Medicine
+                </label>
 
                 <input
                     type="text"
@@ -47,6 +51,7 @@
                     class="selected-medicine"
                     style="display: none;"
                 ></div>
+
             </div>
 
 
@@ -81,13 +86,16 @@
 
 
     <!-- RECENT SALES -->
+
     <div class="table-container">
 
         <div class="section-header">
+
             <div>
                 <h2>Recent Sales</h2>
                 <p>Latest sales records.</p>
             </div>
+
         </div>
 
 
@@ -96,6 +104,7 @@
             <table>
 
                 <thead>
+
                     <tr>
                         <th>Medicine</th>
                         <th>Quantity</th>
@@ -104,6 +113,7 @@
                         <th>Date</th>
                         <th>Action</th>
                     </tr>
+
                 </thead>
 
 
@@ -119,26 +129,21 @@
                             </strong>
                         </td>
 
-
                         <td>
                             {{ sale.quantity }}
                         </td>
-
 
                         <td>
                             ${{ "%.2f"|format(sale.total_price|float) }}
                         </td>
 
-
                         <td>
                             {{ sale.seller.username }}
                         </td>
 
-
                         <td>
                             {{ sale.sale_date.strftime("%Y-%m-%d %H:%M") }}
                         </td>
-
 
                         <td>
 
@@ -164,12 +169,14 @@
                 {% else %}
 
                     <tr>
+
                         <td
                             colspan="6"
                             class="empty"
                         >
                             No sales yet.
                         </td>
+
                     </tr>
 
                 {% endfor %}
@@ -234,18 +241,26 @@
 
             item.innerHTML = `
                 <div>
-                    <strong>${medicine.name}</strong>
+
+                    <strong>
+                        ${medicine.name}
+                    </strong>
+
                     <small>
                         ${medicine.category || "No category"}
                         ${medicine.barcode ? " • " + medicine.barcode : ""}
                     </small>
+
                 </div>
 
                 <span>
+
                     $${Number(medicine.selling_price).toFixed(2)}
+
                     <small>
                         Stock: ${medicine.quantity}
                     </small>
+
                 </span>
             `;
 
@@ -271,6 +286,7 @@
 
                     results.style.display =
                         "none";
+
                 }
             );
 
@@ -281,6 +297,7 @@
 
 
         results.style.display = "block";
+
     }
 
 
@@ -295,6 +312,7 @@
 
 
             // Clear previously selected medicine
+
             medicineId.value = "";
 
             selectedMedicine.style.display =
@@ -307,6 +325,7 @@
                     "none";
 
                 return;
+
             }
 
 
