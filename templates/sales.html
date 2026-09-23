@@ -11,181 +11,167 @@
     </div>
 </div>
 
-<div class="sales-layout">
+<div class="card">
 
-    <!-- NEW SALE -->
+    <h2>New Sale</h2>
 
-    <div class="form-card">
+    <form method="POST" id="saleForm">
 
-        <h2>New Sale</h2>
+        <div class="form-group">
 
-        <form method="POST" id="saleForm">
+            <label for="medicineSearch">
+                Medicine
+            </label>
 
-            <div class="form-group">
-
-                <label for="medicineSearch">
-                    Medicine
-                </label>
-
-                <input
-                    type="text"
-                    id="medicineSearch"
-                    placeholder="Search medicine..."
-                    autocomplete="off"
-                >
-
-                <input
-                    type="hidden"
-                    name="medicine_id"
-                    id="medicineId"
-                    required
-                >
-
-                <div
-                    id="medicineResults"
-                    class="medicine-results"
-                ></div>
-
-                <div
-                    id="selectedMedicine"
-                    class="selected-medicine"
-                    style="display: none;"
-                ></div>
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label for="quantity">
-                    Quantity
-                </label>
-
-                <input
-                    type="number"
-                    name="quantity"
-                    id="quantity"
-                    min="1"
-                    value="1"
-                    required
-                >
-
-            </div>
-
-
-            <button
-                type="submit"
-                class="button primary full"
+            <input
+                type="text"
+                id="medicineSearch"
+                placeholder="Search medicine..."
+                autocomplete="off"
             >
-                Complete Sale
-            </button>
 
-        </form>
+            <input
+                type="hidden"
+                name="medicine_id"
+                id="medicineId"
+                required
+            >
+
+            <div
+                id="medicineResults"
+                class="medicine-results"
+            ></div>
+
+            <div
+                id="selectedMedicine"
+                class="selected-medicine"
+                style="display: none;"
+            ></div>
+
+        </div>
+
+        <div class="form-group">
+
+            <label for="quantity">
+                Quantity
+            </label>
+
+            <input
+                type="number"
+                name="quantity"
+                id="quantity"
+                min="1"
+                value="1"
+                required
+            >
+
+        </div>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+        >
+            Complete Sale
+        </button>
+
+    </form>
+
+</div>
+
+
+<div class="dashboard-section">
+
+    <div class="table-header">
+
+        <div>
+            <h2>Recent Sales</h2>
+            <p>Latest sales records.</p>
+        </div>
 
     </div>
 
-
-    <!-- RECENT SALES -->
-
     <div class="table-container">
 
-        <div class="section-header">
+        <table>
 
-            <div>
-                <h2>Recent Sales</h2>
-                <p>Latest sales records.</p>
-            </div>
+            <thead>
+                <tr>
+                    <th>Medicine</th>
+                    <th>Quantity</th>
+                    <th>Total</th>
+                    <th>Sold By</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-        </div>
+            <tbody>
 
+            {% for sale in recent_sales %}
 
-        <div class="table-responsive">
+                <tr>
 
-            <table>
+                    <td>
+                        <strong>
+                            {{ sale.medicine.name }}
+                        </strong>
+                    </td>
 
-                <thead>
+                    <td>
+                        {{ sale.quantity }}
+                    </td>
 
-                    <tr>
-                        <th>Medicine</th>
-                        <th>Quantity</th>
-                        <th>Total</th>
-                        <th>Sold By</th>
-                        <th>Date</th>
-                        <th>Action</th>
-                    </tr>
-
-                </thead>
-
-
-                <tbody>
-
-                {% for sale in recent_sales %}
-
-                    <tr>
-
-                        <td>
-                            <strong>
-                                {{ sale.medicine.name }}
-                            </strong>
-                        </td>
-
-                        <td>
-                            {{ sale.quantity }}
-                        </td>
-
-                        <td>
+                    <td>
+                        <strong>
                             ${{ "%.2f"|format(sale.total_price|float) }}
-                        </td>
+                        </strong>
+                    </td>
 
-                        <td>
-                            {{ sale.seller.username }}
-                        </td>
+                    <td>
+                        {{ sale.seller.username }}
+                    </td>
 
-                        <td>
-                            {{ sale.sale_date.strftime("%Y-%m-%d %H:%M") }}
-                        </td>
+                    <td>
+                        {{ sale.sale_date.strftime("%Y-%m-%d %H:%M") }}
+                    </td>
 
-                        <td>
+                    <td>
 
-                            <form
-                                method="POST"
-                                action="{{ url_for('delete_sale', id=sale.id) }}"
-                                onsubmit="return confirm('Delete this sale record? The quantity will be returned to stock.');"
-                            >
-
-                                <button
-                                    type="submit"
-                                    class="button danger"
-                                >
-                                    Delete
-                                </button>
-
-                            </form>
-
-                        </td>
-
-                    </tr>
-
-                {% else %}
-
-                    <tr>
-
-                        <td
-                            colspan="6"
-                            class="empty"
+                        <form
+                            method="POST"
+                            action="{{ url_for('delete_sale', id=sale.id) }}"
+                            onsubmit="return confirm('Delete this sale record? The quantity will be returned to stock.');"
                         >
-                            No sales yet.
-                        </td>
 
-                    </tr>
+                            <button
+                                type="submit"
+                                class="btn btn-danger btn-small"
+                            >
+                                Delete
+                            </button>
 
-                {% endfor %}
+                        </form>
 
-                </tbody>
+                    </td>
 
-            </table>
+                </tr>
 
-        </div>
+            {% else %}
+
+                <tr>
+                    <td
+                        colspan="6"
+                        class="empty"
+                    >
+                        No sales yet.
+                    </td>
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
 
     </div>
 
@@ -194,208 +180,246 @@
 
 <script>
 
-    const medicines = {{ medicines|tojson }};
+const medicines = {{ medicines|tojson }};
 
-    const searchInput =
-        document.getElementById("medicineSearch");
+const searchInput =
+    document.getElementById("medicineSearch");
 
-    const medicineId =
-        document.getElementById("medicineId");
+const medicineId =
+    document.getElementById("medicineId");
 
-    const results =
-        document.getElementById("medicineResults");
+const results =
+    document.getElementById("medicineResults");
 
-    const selectedMedicine =
-        document.getElementById("selectedMedicine");
+const selectedMedicine =
+    document.getElementById("selectedMedicine");
 
-    const saleForm =
-        document.getElementById("saleForm");
+const saleForm =
+    document.getElementById("saleForm");
+
+const quantityInput =
+    document.getElementById("quantity");
 
 
-    function showResults(items) {
+function showResults(items) {
 
-        results.innerHTML = "";
+    results.innerHTML = "";
 
-        if (items.length === 0) {
+    if (items.length === 0) {
 
-            results.innerHTML = `
-                <div class="medicine-no-results">
-                    No medicines found.
-                </div>
-            `;
+        results.innerHTML = `
+            <div class="medicine-no-results">
+                No medicines found.
+            </div>
+        `;
 
-            results.style.display = "block";
+        results.style.display = "block";
+
+        return;
+    }
+
+
+    items.forEach(function (medicine) {
+
+        const item =
+            document.createElement("div");
+
+        item.className =
+            "medicine-result";
+
+
+        item.innerHTML = `
+            <div>
+
+                <strong>
+                    ${medicine.name}
+                </strong>
+
+                <small>
+                    ${medicine.category || "No category"}
+                    ${medicine.barcode
+                        ? " • " + medicine.barcode
+                        : ""}
+                </small>
+
+            </div>
+
+            <span>
+
+                $${Number(
+                    medicine.selling_price
+                ).toFixed(2)}
+
+                <small>
+                    Stock: ${medicine.quantity}
+                </small>
+
+            </span>
+        `;
+
+
+        item.addEventListener(
+            "click",
+            function () {
+
+                medicineId.value =
+                    medicine.id;
+
+                searchInput.value =
+                    medicine.name;
+
+                selectedMedicine.innerHTML = `
+                    Selected:
+                    <strong>
+                        ${medicine.name}
+                    </strong>
+                    — Stock:
+                    ${medicine.quantity}
+                `;
+
+                selectedMedicine.style.display =
+                    "block";
+
+                results.style.display =
+                    "none";
+
+                quantityInput.max =
+                    medicine.quantity;
+
+                quantityInput.value = 1;
+
+            }
+        );
+
+
+        results.appendChild(item);
+
+    });
+
+
+    results.style.display =
+        "block";
+}
+
+
+searchInput.addEventListener(
+    "input",
+    function () {
+
+        const term =
+            searchInput.value
+                .trim()
+                .toLowerCase();
+
+
+        medicineId.value = "";
+
+        selectedMedicine.style.display =
+            "none";
+
+
+        if (!term) {
+
+            results.style.display =
+                "none";
 
             return;
         }
 
 
-        items.forEach(function (medicine) {
+        const matches =
+            medicines.filter(function (medicine) {
 
-            const item =
-                document.createElement("div");
+                const name =
+                    (medicine.name || "")
+                        .toLowerCase();
 
-            item.className =
-                "medicine-result";
+                const barcode =
+                    (medicine.barcode || "")
+                        .toLowerCase();
 
-
-            item.innerHTML = `
-                <div>
-
-                    <strong>
-                        ${medicine.name}
-                    </strong>
-
-                    <small>
-                        ${medicine.category || "No category"}
-                        ${medicine.barcode ? " • " + medicine.barcode : ""}
-                    </small>
-
-                </div>
-
-                <span>
-
-                    $${Number(medicine.selling_price).toFixed(2)}
-
-                    <small>
-                        Stock: ${medicine.quantity}
-                    </small>
-
-                </span>
-            `;
+                const category =
+                    (medicine.category || "")
+                        .toLowerCase();
 
 
-            item.addEventListener(
-                "click",
-                function () {
+                return (
+                    name.includes(term) ||
+                    barcode.includes(term) ||
+                    category.includes(term)
+                );
 
-                    medicineId.value =
-                        medicine.id;
+            });
 
-                    searchInput.value =
-                        medicine.name;
 
-                    selectedMedicine.innerHTML = `
-                        Selected:
-                        <strong>${medicine.name}</strong>
-                        — Stock: ${medicine.quantity}
-                    `;
+        showResults(matches);
 
-                    selectedMedicine.style.display =
-                        "block";
+    }
+);
 
-                    results.style.display =
-                        "none";
 
-                }
+saleForm.addEventListener(
+    "submit",
+    function (event) {
+
+        if (!medicineId.value) {
+
+            event.preventDefault();
+
+            alert(
+                "Please search and select a medicine first."
+            );
+
+            searchInput.focus();
+
+            return;
+        }
+
+
+        const selected =
+            medicines.find(
+                medicine =>
+                    String(medicine.id) ===
+                    String(medicineId.value)
             );
 
 
-            results.appendChild(item);
+        if (
+            selected &&
+            Number(quantityInput.value) >
+            Number(selected.quantity)
+        ) {
 
-        });
+            event.preventDefault();
 
+            alert(
+                "The requested quantity is greater than available stock."
+            );
 
-        results.style.display = "block";
+            quantityInput.focus();
+
+        }
 
     }
+);
 
 
-    searchInput.addEventListener(
-        "input",
-        function () {
+document.addEventListener(
+    "click",
+    function (event) {
 
-            const term =
-                searchInput.value
-                    .trim()
-                    .toLowerCase();
+        if (
+            !searchInput.contains(event.target) &&
+            !results.contains(event.target)
+        ) {
 
-
-            // Clear previously selected medicine
-
-            medicineId.value = "";
-
-            selectedMedicine.style.display =
+            results.style.display =
                 "none";
 
-
-            if (!term) {
-
-                results.style.display =
-                    "none";
-
-                return;
-
-            }
-
-
-            const matches =
-                medicines.filter(function (medicine) {
-
-                    const name =
-                        (medicine.name || "")
-                            .toLowerCase();
-
-                    const barcode =
-                        (medicine.barcode || "")
-                            .toLowerCase();
-
-                    const category =
-                        (medicine.category || "")
-                            .toLowerCase();
-
-
-                    return (
-                        name.includes(term) ||
-                        barcode.includes(term) ||
-                        category.includes(term)
-                    );
-
-                });
-
-
-            showResults(matches);
-
         }
-    );
 
-
-    saleForm.addEventListener(
-        "submit",
-        function (event) {
-
-            if (!medicineId.value) {
-
-                event.preventDefault();
-
-                alert(
-                    "Please search and select a medicine first."
-                );
-
-                searchInput.focus();
-
-            }
-
-        }
-    );
-
-
-    document.addEventListener(
-        "click",
-        function (event) {
-
-            if (
-                !searchInput.contains(event.target) &&
-                !results.contains(event.target)
-            ) {
-
-                results.style.display =
-                    "none";
-
-            }
-
-        }
-    );
+    }
+);
 
 </script>
 
