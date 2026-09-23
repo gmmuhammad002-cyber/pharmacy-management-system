@@ -1,101 +1,89 @@
 {% extends "base.html" %}
 
-{% block title %}Sales - Pharmacy{% endblock %}
+{% block title %}Sales{% endblock %}
 
 {% block content %}
 
 <div class="page-header">
     <div>
-        <h1>Sales</h1>
-        <p>Create a new medicine sale.</p>
+        <h1>💰 Sales</h1>
+        <p class="page-subtitle">Create a new sale and view recent sales.</p>
     </div>
 </div>
 
 <div class="card">
-
     <h2>New Sale</h2>
 
     <form method="POST" action="{{ url_for('sales') }}" id="saleForm">
 
         <div class="form-group">
-
-            <label for="medicineSearch">
-                Medicine
-            </label>
+            <label for="medicineSearch">Search Medicine</label>
 
             <input
                 type="text"
                 id="medicineSearch"
-                placeholder="Search medicine..."
+                class="form-control"
+                placeholder="Search by medicine name, barcode or category..."
                 autocomplete="off"
             >
+
+            <div id="medicineResults" class="medicine-results"></div>
 
             <input
                 type="hidden"
                 name="medicine_id"
-                id="medicineId"
+                id="medicine_id"
                 required
             >
+        </div>
 
-            <div
-                id="medicineResults"
-                class="medicine-results"
-            ></div>
-
-            <div
-                id="selectedMedicine"
-                class="selected-medicine"
-                style="display: none;"
-            ></div>
-
+        <div id="selectedMedicine" class="selected-medicine" style="display:none;">
+            <strong>Selected Medicine:</strong>
+            <span id="selectedMedicineName"></span>
+            <br>
+            <span>
+                Price:
+                <strong>$<span id="selectedMedicinePrice">0.00</span></strong>
+            </span>
+            <br>
+            <span>
+                Stock:
+                <strong><span id="selectedMedicineStock">0</span></strong>
+            </span>
         </div>
 
         <div class="form-group">
-
-            <label for="quantity">
-                Quantity
-            </label>
+            <label for="quantity">Quantity</label>
 
             <input
                 type="number"
                 name="quantity"
                 id="quantity"
+                class="form-control"
                 min="1"
                 value="1"
                 required
             >
-
         </div>
 
-        <button
-            type="submit"
-            class="btn btn-primary"
-        >
-            Complete Sale
+        <button type="submit" class="btn btn-primary">
+            💰 Complete Sale
         </button>
 
     </form>
-
 </div>
 
 
-<div class="dashboard-section">
+<div class="card">
+    <h2>Recent Sales</h2>
 
-    <div class="table-header">
-
-        <div>
-            <h2>Recent Sales</h2>
-            <p>Latest sales records.</p>
-        </div>
-
-    </div>
+    {% if recent_sales %}
 
     <div class="table-container">
-
         <table>
-
             <thead>
                 <tr>
+                    <th>ID</th>
                     <th>Medicine</th>
                     <th>Quantity</th>
                     <th>Total</th>
@@ -106,321 +94,283 @@
             </thead>
 
             <tbody>
-
-            {% for sale in recent_sales %}
-
+                {% for sale in recent_sales %}
                 <tr>
+                    <td>#{{ sale.id }}</td>
 
                     <td>
-                        <strong>
+                        {% if sale.medicine %}
                             {{ sale.medicine.name }}
-                        </strong>
+                        {% else %}
+                            Unknown
+                        {% endif %}
+                    </td>
+
+                    <td>{{ sale.quantity }}</td>
+
+                    <td>
+                        ${{ "%.2f"|format(sale.total_price|float) }}
                     </td>
 
                     <td>
-                        {{ sale.quantity }}
+                        {% if sale.user %}
+                            {{ sale.user.username }}
+                        {% else %}
+                            Unknown
+                        {% endif %}
                     </td>
 
                     <td>
-                        <strong>
-                            ${{ "%.2f"|format(sale.total_price|float) }}
-                        </strong>
+                        {% if sale.created_at %}
+                            {{ sale.created_at.strftime("%Y-%m-%d %H:%M") }}
+                        {% else %}
+                            -
+                        {% endif %}
                     </td>
 
                     <td>
-                        {{ sale.seller.username }}
-                    </td>
-
-                    <td>
-                        {{ sale.sale_date.strftime("%Y-%m-%d %H:%M") }}
-                    </td>
-
-                    <td>
-
                         <form
                             method="POST"
-                            action="{{ url_for('delete_sale', id=sale.id) }}"
-                            onsubmit="return confirm('Delete this sale record? The quantity will be returned to stock.');"
+                            action="{{ url_for('delete_sale', sale_id=sale.id) }}"
+                            onsubmit="return confirm('Delete this sale?');"
                         >
-
-                            <button
-                                type="submit"
-                                class="btn btn-danger btn-small"
-                            >
+                            <button type="submit" class="btn btn-danger">
                                 Delete
                             </button>
-
                         </form>
-
-                    </td>
-
-                </tr>
-
-            {% else %}
-
-                <tr>
-                    <td
-                        colspan="6"
-                        class="empty"
-                    >
-                        No sales yet.
                     </td>
                 </tr>
-
-            {% endfor %}
-
+                {% endfor %}
             </tbody>
-
         </table>
-
     </div>
 
+    {% else %}
+
+    <div class="empty-state">
+        <p>No sales yet.</p>
+    </div>
+
+    {% endif %}
 </div>
 
 
+<style>
+    .medicine-results {
+        margin-top: 8px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .medicine-result {
+        padding: 12px 15px;
+        border: 1px solid #ddd;
+        background: white;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .medicine-result:hover {
+        background: #f3f4f6;
+    }
+
+    .medicine-result strong {
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .medicine-result small {
+        color: #666;
+    }
+
+    .selected-medicine {
+        margin: 15px 0;
+        padding: 15px;
+        border-radius: 8px;
+        background: #f0f7ff;
+        border: 1px solid #cfe3ff;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 30px;
+        color: #777;
+    }
+</style>
+
+
 <script>
+    const salesMedicines = {{ medicines|tojson }};
 
-const salesMedicines = {{ medicines|tojson }};
+    const medicineSearch = document.getElementById("medicineSearch");
+    const medicineResults = document.getElementById("medicineResults");
+    const medicineId = document.getElementById("medicine_id");
 
-const searchInput =
-    document.getElementById("medicineSearch");
+    const selectedMedicine = document.getElementById("selectedMedicine");
+    const selectedMedicineName =
+        document.getElementById("selectedMedicineName");
+    const selectedMedicinePrice =
+        document.getElementById("selectedMedicinePrice");
+    const selectedMedicineStock =
+        document.getElementById("selectedMedicineStock");
 
-const medicineId =
-    document.getElementById("medicineId");
-
-const results =
-    document.getElementById("medicineResults");
-
-const selectedMedicine =
-    document.getElementById("selectedMedicine");
-
-const saleForm =
-    document.getElementById("saleForm");
-
-const quantityInput =
-    document.getElementById("quantity");
+    const quantityInput = document.getElementById("quantity");
+    const saleForm = document.getElementById("saleForm");
 
 
-function showResults(items) {
+    function showMedicineResults(searchText) {
 
-    results.innerHTML = "";
+        medicineResults.innerHTML = "";
 
-    if (items.length === 0) {
+        const search = searchText.trim().toLowerCase();
 
-        results.innerHTML = `
-            <div class="medicine-no-results">
-                No medicines found.
-            </div>
-        `;
+        if (!search) {
+            return;
+        }
 
-        results.style.display = "block";
+        const matches = salesMedicines.filter(function(medicine) {
 
-        return;
+            const name = String(medicine.name || "").toLowerCase();
+            const barcode = String(medicine.barcode || "").toLowerCase();
+            const category = String(medicine.category || "").toLowerCase();
+
+            return (
+                name.includes(search) ||
+                barcode.includes(search) ||
+                category.includes(search)
+            );
+        });
+
+        if (matches.length === 0) {
+
+            medicineResults.innerHTML = `
+                <div class="medicine-result">
+                    <small>No medicines found.</small>
+                </div>
+            `;
+
+            return;
+        }
+
+        matches.slice(0, 10).forEach(function(medicine) {
+
+            const result = document.createElement("div");
+
+            result.className = "medicine-result";
+
+            result.innerHTML = `
+                <strong>${escapeHtml(medicine.name)}</strong>
+                <small>
+                    Barcode: ${escapeHtml(medicine.barcode || "-")}
+                    |
+                    Category: ${escapeHtml(medicine.category || "-")}
+                    |
+                    Price: $${Number(medicine.price ?? medicine.selling_price ?? 0).toFixed(2)}
+                    |
+                    Stock: ${Number(medicine.quantity || 0)}
+                </small>
+            `;
+
+            result.addEventListener("click", function() {
+                selectMedicine(medicine);
+            });
+
+            medicineResults.appendChild(result);
+        });
     }
 
 
-    items.forEach(function (medicine) {
+    function selectMedicine(medicine) {
 
-        const item =
-            document.createElement("div");
+        medicineId.value = medicine.id;
 
-        item.className =
-            "medicine-result";
+        medicineSearch.value = medicine.name;
 
+        selectedMedicineName.textContent = medicine.name;
 
-        item.innerHTML = `
-            <div>
-
-                <strong>
-                    ${medicine.name}
-                </strong>
-
-                <small>
-                    ${medicine.category || "No category"}
-                    ${medicine.barcode
-                        ? " • " + medicine.barcode
-                        : ""}
-                </small>
-
-            </div>
-
-            <span>
-
-                $${Number(
-                    medicine.selling_price
-                ).toFixed(2)}
-
-                <small>
-                    Stock: ${medicine.quantity}
-                </small>
-
-            </span>
-        `;
-
-
-        item.addEventListener(
-            "click",
-            function () {
-
-                medicineId.value =
-                    medicine.id;
-
-                searchInput.value =
-                    medicine.name;
-
-                selectedMedicine.innerHTML = `
-                    Selected:
-                    <strong>
-                        ${medicine.name}
-                    </strong>
-                    — Stock:
-                    ${medicine.quantity}
-                `;
-
-                selectedMedicine.style.display =
-                    "block";
-
-                results.style.display =
-                    "none";
-
-                quantityInput.max =
-                    medicine.quantity;
-
-                quantityInput.value = 1;
-
-            }
+        const price = Number(
+            medicine.price ?? medicine.selling_price ?? 0
         );
 
+        selectedMedicinePrice.textContent = price.toFixed(2);
 
-        results.appendChild(item);
+        selectedMedicineStock.textContent =
+            Number(medicine.quantity || 0);
 
+        selectedMedicine.style.display = "block";
+
+        medicineResults.innerHTML = "";
+
+        quantityInput.max = Number(medicine.quantity || 0);
+
+        if (Number(medicine.quantity || 0) === 0) {
+            quantityInput.value = 0;
+        } else {
+            quantityInput.value = 1;
+        }
+    }
+
+
+    medicineSearch.addEventListener("input", function() {
+        medicineId.value = "";
+        selectedMedicine.style.display = "none";
+        showMedicineResults(this.value);
     });
 
 
-    results.style.display =
-        "block";
-}
-
-
-searchInput.addEventListener(
-    "input",
-    function () {
-
-        const term =
-            searchInput.value
-                .trim()
-                .toLowerCase();
-
-
-        medicineId.value = "";
-
-        selectedMedicine.style.display =
-            "none";
-
-
-        if (!term) {
-
-            results.style.display =
-                "none";
-
-            return;
-        }
-
-
-        const matches =
-            salesMedicines.filter(function (medicine) {
-
-                const name =
-                    (medicine.name || "")
-                        .toLowerCase();
-
-                const barcode =
-                    (medicine.barcode || "")
-                        .toLowerCase();
-
-                const category =
-                    (medicine.category || "")
-                        .toLowerCase();
-
-
-                return (
-                    name.includes(term) ||
-                    barcode.includes(term) ||
-                    category.includes(term)
-                );
-
-            });
-
-
-        showResults(matches);
-
-    }
-);
-
-
-saleForm.addEventListener(
-    "submit",
-    function (event) {
+    saleForm.addEventListener("submit", function(event) {
 
         if (!medicineId.value) {
-
             event.preventDefault();
 
-            alert(
-                "Please search and select a medicine first."
-            );
+            alert("Please select a medicine from the search results.");
 
-            searchInput.focus();
+            medicineSearch.focus();
 
             return;
         }
 
+        const quantity = Number(quantityInput.value);
 
-        const selected =
-            salesMedicines.find(
-                medicine =>
-                    String(medicine.id) ===
-                    String(medicineId.value)
-            );
+        const medicine = salesMedicines.find(function(item) {
+            return String(item.id) === String(medicineId.value);
+        });
 
+        if (!medicine) {
+            event.preventDefault();
+            alert("Selected medicine could not be found.");
+            return;
+        }
 
-        if (
-            selected &&
-            Number(quantityInput.value) >
-            Number(selected.quantity)
-        ) {
+        const stock = Number(medicine.quantity || 0);
 
+        if (quantity < 1) {
+            event.preventDefault();
+            alert("Quantity must be at least 1.");
+            return;
+        }
+
+        if (quantity > stock) {
             event.preventDefault();
 
             alert(
-                "The requested quantity is greater than available stock."
+                "Not enough stock. Available stock: " + stock
             );
 
-            quantityInput.focus();
-
+            return;
         }
+    });
 
+
+    function escapeHtml(value) {
+
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
-);
-
-
-document.addEventListener(
-    "click",
-    function (event) {
-
-        if (
-            !searchInput.contains(event.target) &&
-            !results.contains(event.target)
-        ) {
-
-            results.style.display =
-                "none";
-
-        }
-
-    }
-);
-
 </script>
 
 {% endblock %}
