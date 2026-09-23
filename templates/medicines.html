@@ -60,14 +60,12 @@
         </button>
 
         {% if search %}
-
             <a
                 href="{{ url_for('medicines') }}"
                 class="btn btn-light"
             >
                 Clear
             </a>
-
         {% endif %}
 
     </form>
@@ -109,8 +107,6 @@
                         <th>Category</th>
 
                         <th>Stock</th>
-
-                        <th>Selling</th>
 
                         <th>Expiry</th>
 
@@ -185,15 +181,6 @@
                                 </span>
 
                             {% endif %}
-
-                        </td>
-
-
-                        <td>
-
-                            <strong class="selling-price">
-                                {{ "%.2f"|format(medicine.selling_price|float) }}
-                            </strong>
 
                         </td>
 
@@ -320,14 +307,12 @@
         Available
     </div>
 
-
     <div>
         <span class="badge badge-warning">
             Low stock
         </span>
         10 or fewer
     </div>
-
 
     <div>
         <span class="badge badge-danger">
