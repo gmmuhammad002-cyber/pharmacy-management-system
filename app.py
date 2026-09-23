@@ -546,7 +546,6 @@ def logout():
 # =========================================================
 
 @app.route("/medicines")
-@login_required
 def medicines():
 
     medicines = Medicine.query.order_by(
