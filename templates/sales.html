@@ -15,7 +15,7 @@
 
     <h2>New Sale</h2>
 
-    <form method="POST" id="saleForm">
+    <form method="POST" action="{{ url_for('sales') }}" id="saleForm">
 
         <div class="form-group">
 
@@ -180,7 +180,7 @@
 
 <script>
 
-const medicines = {{ medicines|tojson }};
+const salesMedicines = {{ medicines|tojson }};
 
 const searchInput =
     document.getElementById("medicineSearch");
@@ -328,7 +328,7 @@ searchInput.addEventListener(
 
 
         const matches =
-            medicines.filter(function (medicine) {
+            salesMedicines.filter(function (medicine) {
 
                 const name =
                     (medicine.name || "")
@@ -377,7 +377,7 @@ saleForm.addEventListener(
 
 
         const selected =
-            medicines.find(
+            salesMedicines.find(
                 medicine =>
                     String(medicine.id) ===
                     String(medicineId.value)
