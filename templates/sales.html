@@ -131,7 +131,7 @@
                     <td>
                         <form
                             method="POST"
-                            action="{{ url_for('delete_sale', sale_id=sale.id) }}"
+                            action="{{ url_for('delete_sale', id=sale.id) }}"
                             onsubmit="return confirm('Delete this sale?');"
                         >
                             <button type="submit" class="btn btn-danger">

@@ -54,6 +54,12 @@
                 Sales
             </a>
 
+            {% if current_user.role in ['admin','pharmacist','inventory'] %}
+                <a href="{{ url_for('stock_movements') }}">Stock History</a>
+                <a href="{{ url_for('suppliers') }}">Suppliers</a>
+                <a href="{{ url_for('reports') }}">Reports</a>
+            {% endif %}
+
             <a href="{{ url_for('add_medicine') }}">
                 Add Medicine
             </a>

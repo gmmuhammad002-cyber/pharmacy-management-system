@@ -2074,3 +2074,10 @@ tbody tr:last-child td {
         align-items: flex-start;
     }
 }
+.filter-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; align-items:center; }
+.filter-row select { min-width:170px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#fff; }
+.inventory-summary .stat-card { text-decoration:none; color:inherit; }
+.table-container { overflow-x:auto; }
+.badge.badge-notice { background:#dbeafe; color:#1d4ed8; }
+.badge.badge-neutral { background:#e5e7eb; color:#374151; }
+@media (max-width: 800px) { .page-header { align-items:flex-start; flex-direction:column; } .nav-links { gap:2px; } .navbar { padding:10px 14px; } .container { padding:22px 12px 40px; } .filter-row select, .filter-row .btn { width:100%; } }
