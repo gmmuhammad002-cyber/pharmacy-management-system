@@ -65,9 +65,6 @@ elif database_url.startswith("postgresql+psycopg2://"):
         1
     )
 
-if not database_url:
-    database_url = "sqlite:///pharmacy.db"
-
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -918,58 +915,143 @@ def initialize_database():
 
     try:
 
+        # Create missing tables first.  IMPORTANT:
+        # db.create_all() does NOT add missing columns to existing tables,
+        # so the migration below is also required for an existing database.
         db.create_all()
 
-        # Lightweight schema migration for the bundled SQLite database.
-        # New deployments are handled by create_all(); existing databases
-        # receive only the columns that are missing.
         from sqlalchemy import inspect, text
 
         inspector = inspect(db.engine)
 
-        sqlite_migrations = {
-            "medicine": {
-                "sku": "VARCHAR(100)",
-                "generic_name": "VARCHAR(150)",
-                "brand_name": "VARCHAR(150)",
-                "dosage_form": "VARCHAR(100)",
-                "route": "VARCHAR(100)",
-                "strength": "VARCHAR(100)",
-                "unit": "VARCHAR(50)",
-                "manufacturer": "VARCHAR(150)",
-                "supplier": "VARCHAR(150)",
-                "purchase_price": "FLOAT NOT NULL DEFAULT 0",
-                "minimum_stock": "INTEGER NOT NULL DEFAULT 10",
-                "maximum_stock": "INTEGER NOT NULL DEFAULT 100",
-                "reorder_level": "INTEGER NOT NULL DEFAULT 10",
-                "storage_requirements": "VARCHAR(255)",
-                "prescription_required": "BOOLEAN NOT NULL DEFAULT 0",
-                "active": "BOOLEAN NOT NULL DEFAULT 1"
-            },
-            "sale": {
-                "batch_id": "INTEGER"
-            }
+        # ---------------------------------------------------------
+        # PostgreSQL / SQLite compatibility migrations
+        # ---------------------------------------------------------
+        # These columns exist in the current SQLAlchemy models but may
+        # be missing from an older Render PostgreSQL database.
+        medicine_migrations = {
+            "sku": "VARCHAR(100)",
+            "generic_name": "VARCHAR(150)",
+            "brand_name": "VARCHAR(150)",
+            "category": "VARCHAR(100)",
+            "dosage_form": "VARCHAR(100)",
+            "route": "VARCHAR(100)",
+            "strength": "VARCHAR(100)",
+            "unit": "VARCHAR(50)",
+            "manufacturer": "VARCHAR(150)",
+            "supplier": "VARCHAR(150)",
+            "purchase_price": "DOUBLE PRECISION DEFAULT 0",
+            "minimum_stock": "INTEGER DEFAULT 10",
+            "maximum_stock": "INTEGER DEFAULT 100",
+            "reorder_level": "INTEGER DEFAULT 10",
+            "storage_requirements": "VARCHAR(255)",
+            "prescription_required": "BOOLEAN DEFAULT FALSE",
+            "active": "BOOLEAN DEFAULT TRUE"
         }
 
-        if db.engine.dialect.name == "sqlite":
-            for table_name, columns in sqlite_migrations.items():
-                if table_name not in inspector.get_table_names():
-                    continue
-                existing = {column["name"] for column in inspector.get_columns(table_name)}
-                for column_name, definition in columns.items():
-                    if column_name not in existing:
-                        db.session.execute(text(
-                            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
-                        ))
+        # Older versions may already have some of these fields.
+        # Add only the missing ones.
+        if "medicine" in inspector.get_table_names():
+
+            existing_columns = {
+                column["name"]
+                for column in inspector.get_columns("medicine")
+            }
+
+            for column_name, column_definition in medicine_migrations.items():
+
+                if column_name not in existing_columns:
+
+                    print(
+                        f"DATABASE MIGRATION: adding medicine.{column_name}"
+                    )
+
+                    db.session.execute(
+                        text(
+                            f"ALTER TABLE medicine "
+                            f"ADD COLUMN {column_name} {column_definition}"
+                        )
+                    )
+
             db.session.commit()
 
-            # Keep SKU unique when the column exists on an older database.
-            db.session.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ix_medicine_sku_unique "
-                "ON medicine (sku) WHERE sku IS NOT NULL"
-            ))
-            db.session.commit()
+        # Sale.batch_id was added when batch-aware FEFO sales were introduced.
+        if "sale" in inspector.get_table_names():
 
+            sale_columns = {
+                column["name"]
+                for column in inspector.get_columns("sale")
+            }
+
+            if "batch_id" not in sale_columns:
+
+                print(
+                    "DATABASE MIGRATION: adding sale.batch_id"
+                )
+
+                db.session.execute(
+                    text(
+                        "ALTER TABLE sale "
+                        "ADD COLUMN batch_id INTEGER"
+                    )
+                )
+
+                db.session.commit()
+
+        # StockMovement.batch_id is also required by the current model.
+        if "stock_movement" in inspector.get_table_names():
+
+            movement_columns = {
+                column["name"]
+                for column in inspector.get_columns(
+                    "stock_movement"
+                )
+            }
+
+            if "batch_id" not in movement_columns:
+
+                print(
+                    "DATABASE MIGRATION: adding stock_movement.batch_id"
+                )
+
+                db.session.execute(
+                    text(
+                        "ALTER TABLE stock_movement "
+                        "ADD COLUMN batch_id INTEGER"
+                    )
+                )
+
+                db.session.commit()
+
+        # The SQLAlchemy model declares SKU as unique.  Creating the index
+        # separately keeps existing data intact and allows multiple NULLs.
+        if "medicine" in inspector.get_table_names():
+
+            try:
+
+                db.session.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS "
+                        "ix_medicine_sku_unique "
+                        "ON medicine (sku)"
+                    )
+                )
+
+                db.session.commit()
+
+            except Exception as index_error:
+
+                db.session.rollback()
+
+                print(
+                    "SKU INDEX WARNING:",
+                    type(index_error).__name__,
+                    str(index_error)
+                )
+
+        # ---------------------------------------------------------
+        # Admin user
+        # ---------------------------------------------------------
         admin = User.query.filter_by(
             username="admin"
         ).first()
@@ -1420,30 +1502,6 @@ def medicines():
         for row in categories
     ]
 
-    summary = {
-        "total": Medicine.query.filter_by(active=True).count(),
-        "low": Medicine.query.filter(
-            Medicine.active.is_(True),
-            Medicine.quantity > 0,
-            Medicine.quantity <= Medicine.reorder_level
-        ).count(),
-        "out": Medicine.query.filter(
-            Medicine.active.is_(True),
-            Medicine.quantity <= 0
-        ).count(),
-        "expiring": Medicine.query.filter(
-            Medicine.active.is_(True),
-            Medicine.expiry_date.isnot(None),
-            Medicine.expiry_date >= today,
-            Medicine.expiry_date <= today + timedelta(days=30)
-        ).count(),
-        "expired": Medicine.query.filter(
-            Medicine.active.is_(True),
-            Medicine.expiry_date.isnot(None),
-            Medicine.expiry_date < today
-        ).count()
-    }
-
     medicine_data = []
 
     for medicine in medicines_list:
@@ -1471,8 +1529,7 @@ def medicines():
         categories=category_list,
         search=search,
         status=status,
-        selected_category=category,
-        inventory_summary=summary
+        selected_category=category
     )
 
 
@@ -1570,6 +1627,11 @@ def add_medicine():
             "0"
         )
 
+        quantity_raw = request.form.get(
+            "quantity",
+            "0"
+        )
+
         minimum_stock_raw = request.form.get(
             "minimum_stock",
             "10"
@@ -1622,6 +1684,10 @@ def add_medicine():
                 purchase_price_raw or 0
             )
 
+            quantity = int(
+                quantity_raw or 0
+            )
+
             minimum_stock = int(
                 minimum_stock_raw or 10
             )
@@ -1648,6 +1714,7 @@ def add_medicine():
         if (
             price < 0
             or purchase_price < 0
+            or quantity < 0
             or minimum_stock < 0
             or maximum_stock < 0
             or reorder_level < 0
@@ -1899,6 +1966,11 @@ def edit_medicine(id):
             "0"
         )
 
+        quantity_raw = request.form.get(
+            "quantity",
+            "0"
+        )
+
         minimum_stock_raw = request.form.get(
             "minimum_stock",
             "10"
@@ -1954,6 +2026,10 @@ def edit_medicine(id):
                 purchase_price_raw or 0
             )
 
+            quantity = int(
+                quantity_raw or 0
+            )
+
             minimum_stock = int(
                 minimum_stock_raw or 10
             )
@@ -1983,6 +2059,7 @@ def edit_medicine(id):
         if (
             price < 0
             or purchase_price < 0
+            or quantity < 0
             or minimum_stock < 0
             or maximum_stock < 0
             or reorder_level < 0
@@ -2095,8 +2172,7 @@ def edit_medicine(id):
         medicine.supplier = supplier or None
         medicine.price = price
         medicine.purchase_price = purchase_price
-        # Stock is intentionally not editable here.
-        # Use /adjust-stock so the change gets a reason/reference and audit entry.
+        medicine.quantity = quantity
         medicine.minimum_stock = minimum_stock
         medicine.maximum_stock = maximum_stock
         medicine.reorder_level = reorder_level
@@ -2107,6 +2183,19 @@ def edit_medicine(id):
         medicine.prescription_required = (
             prescription_required
         )
+
+        if quantity != old_quantity:
+
+            add_stock_movement(
+                medicine=medicine,
+                movement_type="Adjustment",
+                quantity=(
+                    quantity - old_quantity
+                ),
+                previous_quantity=old_quantity,
+                new_quantity=quantity,
+                reason="Medicine edit"
+            )
 
         db.session.commit()
 
@@ -2614,14 +2703,9 @@ def sales():
 
         batches = Batch.query.filter(
             Batch.medicine_id == medicine.id,
-            Batch.quantity > 0,
-            db.or_(
-                Batch.expiry_date.is_(None),
-                Batch.expiry_date >= date.today()
-            )
+            Batch.quantity > 0
         ).order_by(
-            Batch.expiry_date.asc().nullslast(),
-            Batch.id.asc()
+            Batch.expiry_date.asc().nullslast()
         ).all()
 
         for batch in batches:
@@ -2639,13 +2723,6 @@ def sales():
 
             if selected_batch is None:
                 selected_batch = batch
-
-        if batches and remaining > 0:
-            flash(
-                "Not enough non-expired batch stock available.",
-                "danger"
-            )
-            return redirect(url_for("sales"))
 
         previous_quantity = int(
             medicine.quantity
@@ -2784,11 +2861,6 @@ def delete_sale(id):
                 sale_quantity
             )
 
-            if sale.batch_id:
-                batch = db.session.get(Batch, sale.batch_id)
-                if batch:
-                    batch.quantity += sale_quantity
-
             add_stock_movement(
                 medicine=medicine,
                 movement_type="Return",
@@ -2796,11 +2868,7 @@ def delete_sale(id):
                 previous_quantity=previous_quantity,
                 new_quantity=medicine.quantity,
                 reason="Sale deleted",
-                reference=f"Sale #{sale.id}",
-                batch=(
-                    db.session.get(Batch, sale.batch_id)
-                    if sale.batch_id else None
-                )
+                reference=f"Sale #{sale.id}"
             )
 
         medicine_name = (
@@ -3443,8 +3511,15 @@ def suppliers():
     ).all()
 
     return render_template(
-        "suppliers.html",
-        suppliers=suppliers_list
+        "medicines.html",
+        medicines=[],
+        medicine_data=[],
+        categories=[],
+        suppliers=suppliers_list,
+        supplier_page=True,
+        search="",
+        status="all",
+        selected_category=""
     )
 
 
@@ -3496,35 +3571,46 @@ def reports():
     ).scalar()
 
     return render_template(
-        "reports.html",
+        "index.html",
+        report_page=True,
         total_inventory_value=total_inventory_value,
         total_sales=total_sales,
         total_units_sold=total_units_sold,
-        medicine_count=Medicine.query.filter_by(active=True).count(),
+        medicine_count=Medicine.query.filter_by(
+            active=True
+        ).count(),
         total_stock=db.session.query(
-            db.func.coalesce(db.func.sum(Medicine.quantity), 0)
-        ).filter(Medicine.active.is_(True)).scalar(),
+            db.func.coalesce(
+                db.func.sum(Medicine.quantity),
+                0
+            )
+        ).scalar(),
+        sales_count=Sale.query.count(),
+        today_sales=0,
         low_stock=Medicine.query.filter(
-            Medicine.active.is_(True),
-            Medicine.quantity > 0,
             Medicine.quantity <= Medicine.reorder_level
         ).count(),
         out_of_stock=Medicine.query.filter(
-            Medicine.active.is_(True),
             Medicine.quantity <= 0
         ).count(),
         expired=Medicine.query.filter(
-            Medicine.active.is_(True),
             Medicine.expiry_date.isnot(None),
             Medicine.expiry_date < date.today()
         ).count(),
         expiring_soon=Medicine.query.filter(
-            Medicine.active.is_(True),
             Medicine.expiry_date.isnot(None),
             Medicine.expiry_date >= date.today(),
-            Medicine.expiry_date <= date.today() + timedelta(days=30)
+            Medicine.expiry_date <= (
+                date.today() +
+                timedelta(days=30)
+            )
+        ).count(),
+        recent_sales=[],
+        pending_orders=Order.query.filter_by(
+            status="Pending"
         ).count()
     )
+
 
 # =========================================================
 # ACTIVITY LOGS
