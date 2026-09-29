@@ -347,7 +347,18 @@
 
 <script>
 
-const medicines = {{ medicines|tojson }};
+const medicines = [
+    {% for medicine in medicines %}
+    {
+        id: {{ medicine.id|tojson }},
+        name: {{ medicine.name|tojson }},
+        barcode: {{ medicine.barcode|default("", true)|tojson }},
+        category: {{ medicine.category|default("", true)|tojson }},
+        quantity: {{ medicine.quantity|default(0, true)|int }},
+        price: {{ medicine.price|default(0, true)|float }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
 
 const searchInput =
     document.getElementById("medicineSearch");
@@ -411,7 +422,7 @@ function showResults(items) {
 
             <span>
 
-                $${Number(medicine.selling_price).toFixed(2)}
+                $${Number(medicine.price || 0).toFixed(2)}
 
                 <small>
                     Stock: ${medicine.quantity}
