@@ -1050,6 +1050,76 @@ def initialize_database():
                 )
 
         # ---------------------------------------------------------
+        # Order / OrderItem migrations
+        # ---------------------------------------------------------
+        # Older databases may have order tables with fewer columns.
+        # Add only missing columns so existing orders/data are preserved.
+        if "order" in inspector.get_table_names():
+
+            order_columns = {
+                column["name"]
+                for column in inspector.get_columns("order")
+            }
+
+            order_migrations = {
+                "customer_name": "VARCHAR(150) DEFAULT ''",
+                "customer_phone": "VARCHAR(50) DEFAULT ''",
+                "customer_address": "TEXT DEFAULT ''",
+                "status": "VARCHAR(30) DEFAULT 'Pending'",
+                "total_price": "DOUBLE PRECISION DEFAULT 0",
+                "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            }
+
+            for column_name, column_definition in order_migrations.items():
+
+                if column_name not in order_columns:
+
+                    print(
+                        f"DATABASE MIGRATION: adding order.{column_name}"
+                    )
+
+                    db.session.execute(
+                        text(
+                            f"ALTER TABLE \"order\" "
+                            f"ADD COLUMN {column_name} {column_definition}"
+                        )
+                    )
+
+            db.session.commit()
+
+        if "order_item" in inspector.get_table_names():
+
+            order_item_columns = {
+                column["name"]
+                for column in inspector.get_columns("order_item")
+            }
+
+            order_item_migrations = {
+                "order_id": "INTEGER",
+                "medicine_id": "INTEGER",
+                "quantity": "INTEGER DEFAULT 1",
+                "unit_price": "DOUBLE PRECISION DEFAULT 0",
+                "total_price": "DOUBLE PRECISION DEFAULT 0"
+            }
+
+            for column_name, column_definition in order_item_migrations.items():
+
+                if column_name not in order_item_columns:
+
+                    print(
+                        f"DATABASE MIGRATION: adding order_item.{column_name}"
+                    )
+
+                    db.session.execute(
+                        text(
+                            f"ALTER TABLE order_item "
+                            f"ADD COLUMN {column_name} {column_definition}"
+                        )
+                    )
+
+            db.session.commit()
+
+        # ---------------------------------------------------------
         # Admin user
         # ---------------------------------------------------------
         admin = User.query.filter_by(
@@ -1114,6 +1184,28 @@ with app.app_context():
 # =========================================================
 # MEDICINE STATUS HELPERS
 # =========================================================
+
+def get_effective_expiry_date(medicine):
+
+    # Medicine-level expiry is preferred. If it is empty, use the
+    # earliest batch expiry. This keeps the inventory status consistent
+    # with what the Medicines page actually displays.
+    if medicine.expiry_date:
+        return medicine.expiry_date
+
+    try:
+        batch_expiry = db.session.query(
+            db.func.min(Batch.expiry_date)
+        ).filter(
+            Batch.medicine_id == medicine.id,
+            Batch.expiry_date.isnot(None)
+        ).scalar()
+
+        return batch_expiry
+
+    except Exception:
+        return None
+
 
 def get_expiry_status(expiry_date):
 
@@ -1189,8 +1281,12 @@ def get_stock_status(medicine):
 
 def medicine_to_dict(medicine):
 
+    effective_expiry = get_effective_expiry_date(
+        medicine
+    )
+
     expiry = get_expiry_status(
-        medicine.expiry_date
+        effective_expiry
     )
 
     stock = get_stock_status(
@@ -1294,20 +1390,27 @@ def index():
         Medicine.quantity <= 0
     ).count()
 
-    expired = Medicine.query.filter(
-        Medicine.active.is_(True),
-        Medicine.expiry_date.isnot(None),
-        Medicine.expiry_date < today
-    ).count()
+    active_medicines = Medicine.query.filter(
+        Medicine.active.is_(True)
+    ).all()
 
-    expiring_soon = Medicine.query.filter(
-        Medicine.active.is_(True),
-        Medicine.expiry_date.isnot(None),
-        Medicine.expiry_date >= today,
-        Medicine.expiry_date <= (
-            today + timedelta(days=30)
+    expired = 0
+    expiring_soon = 0
+
+    for medicine in active_medicines:
+
+        expiry_date = get_effective_expiry_date(
+            medicine
         )
-    ).count()
+
+        if not expiry_date:
+            continue
+
+        if expiry_date < today:
+            expired += 1
+
+        elif expiry_date <= today + timedelta(days=30):
+            expiring_soon += 1
 
     recent_sales = Sale.query.order_by(
         Sale.created_at.desc()
@@ -1467,26 +1570,36 @@ def medicines():
             Medicine.quantity <= 0
         )
 
-    elif status == "expired":
-
-        query = query.filter(
-            Medicine.expiry_date.isnot(None),
-            Medicine.expiry_date < today
-        )
-
-    elif status == "expiring":
-
-        query = query.filter(
-            Medicine.expiry_date.isnot(None),
-            Medicine.expiry_date >= today,
-            Medicine.expiry_date <= (
-                today + timedelta(days=30)
-            )
-        )
-
     medicines_list = query.order_by(
         Medicine.name.asc()
     ).all()
+
+    # Expiry can live on the medicine or on its batches. Filter after
+    # loading the active medicines so both sources are handled correctly.
+    if status in {"expired", "expiring"}:
+
+        filtered_medicines = []
+
+        for medicine in medicines_list:
+
+            expiry_date = get_effective_expiry_date(
+                medicine
+            )
+
+            if not expiry_date:
+                continue
+
+            if status == "expired" and expiry_date < today:
+                filtered_medicines.append(medicine)
+
+            elif (
+                status == "expiring"
+                and expiry_date >= today
+                and expiry_date <= today + timedelta(days=30)
+            ):
+                filtered_medicines.append(medicine)
+
+        medicines_list = filtered_medicines
 
     categories = db.session.query(
         Medicine.category
@@ -1511,7 +1624,7 @@ def medicines():
         )
 
         data["expiry_info"] = get_expiry_status(
-            medicine.expiry_date
+            get_effective_expiry_date(medicine)
         )
 
         data["stock_info"] = get_stock_status(
@@ -1522,6 +1635,45 @@ def medicines():
             data
         )
 
+    # Summary cards must be calculated from the full active inventory,
+    # not only from the currently filtered list. Expiry also considers batches.
+    all_active_medicines = Medicine.query.filter_by(
+        active=True
+    ).all()
+
+    summary_low = 0
+    summary_out = 0
+    summary_expired = 0
+    summary_expiring = 0
+
+    for medicine in all_active_medicines:
+
+        quantity = int(medicine.quantity or 0)
+        reorder = int(medicine.reorder_level or 10)
+
+        if quantity <= 0:
+            summary_out += 1
+        elif quantity <= reorder:
+            summary_low += 1
+
+        expiry_date = get_effective_expiry_date(medicine)
+
+        if expiry_date:
+
+            if expiry_date < today:
+                summary_expired += 1
+
+            elif expiry_date <= today + timedelta(days=30):
+                summary_expiring += 1
+
+    inventory_summary = {
+        "total": len(all_active_medicines),
+        "low": summary_low,
+        "out": summary_out,
+        "expired": summary_expired,
+        "expiring": summary_expiring
+    }
+
     return render_template(
         "medicines.html",
         medicines=medicines_list,
@@ -1529,7 +1681,8 @@ def medicines():
         categories=category_list,
         search=search,
         status=status,
-        selected_category=category
+        selected_category=category,
+        inventory_summary=inventory_summary
     )
 
 
@@ -2952,163 +3105,136 @@ def orders():
 
     if request.method == "POST":
 
-        customer_name = request.form.get(
-            "customer_name",
-            ""
-        ).strip()
-
-        customer_phone = request.form.get(
-            "customer_phone",
-            ""
-        ).strip()
-
-        customer_address = request.form.get(
-            "customer_address",
-            ""
-        ).strip()
-
         try:
 
-            medicine_id = int(
-                request.form.get(
-                    "medicine_id",
-                    ""
+            customer_name = request.form.get(
+                "customer_name",
+                ""
+            ).strip()
+
+            customer_phone = request.form.get(
+                "customer_phone",
+                ""
+            ).strip()
+
+            customer_address = request.form.get(
+                "customer_address",
+                ""
+            ).strip()
+
+            medicine_raw = request.form.get(
+                "medicine_id",
+                ""
+            ).strip()
+
+            quantity_raw = request.form.get(
+                "quantity",
+                ""
+            ).strip()
+
+            if not customer_name:
+                raise ValueError("Customer name is required.")
+
+            if not customer_phone:
+                raise ValueError("Customer phone is required.")
+
+            if not customer_address:
+                raise ValueError("Customer address is required.")
+
+            if not medicine_raw:
+                raise ValueError("Please select a medicine.")
+
+            try:
+                medicine_id = int(medicine_raw)
+                quantity = int(quantity_raw)
+            except (ValueError, TypeError):
+                raise ValueError(
+                    "Please select a medicine and enter a valid quantity."
                 )
-            )
 
-            quantity = int(
-                request.form.get(
-                    "quantity",
-                    ""
+            if quantity <= 0:
+                raise ValueError(
+                    "Quantity must be greater than zero."
                 )
+
+            medicine = db.session.get(
+                Medicine,
+                medicine_id
             )
 
-        except (
-            ValueError,
-            TypeError
-        ):
+            if not medicine or not medicine.active:
+                raise ValueError("Medicine not found or inactive.")
+
+            available_quantity = int(
+                medicine.quantity or 0
+            )
+
+            if quantity > available_quantity:
+                raise ValueError(
+                    f"Requested quantity is not available. "
+                    f"Available stock: {available_quantity}."
+                )
+
+            unit_price = float(
+                medicine.price or 0
+            )
+
+            total_price = unit_price * quantity
+
+            order = Order(
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_address=customer_address,
+                status="Pending",
+                total_price=total_price
+            )
+
+            db.session.add(order)
+            db.session.flush()
+
+            item = OrderItem(
+                order_id=order.id,
+                medicine_id=medicine.id,
+                quantity=quantity,
+                unit_price=unit_price,
+                total_price=total_price
+            )
+
+            db.session.add(item)
+            db.session.commit()
+
+            log_activity(
+                f"Public order created: #{order.id}"
+            )
 
             flash(
-                "Please select a medicine and enter a valid quantity.",
+                f"Order #{order.id} placed successfully.",
+                "success"
+            )
+
+        except ValueError as e:
+
+            db.session.rollback()
+
+            flash(
+                str(e),
                 "danger"
             )
 
-            return redirect(
-                url_for("orders")
-            )
+        except Exception as e:
 
-        if not customer_name:
+            db.session.rollback()
+
+            print(
+                "ORDER CREATION ERROR:",
+                type(e).__name__,
+                str(e)
+            )
 
             flash(
-                "Customer name is required.",
+                f"Order could not be created: {type(e).__name__}: {str(e)[:300]}",
                 "danger"
             )
-
-            return redirect(
-                url_for("orders")
-            )
-
-        if not customer_phone:
-
-            flash(
-                "Customer phone is required.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("orders")
-            )
-
-        if not customer_address:
-
-            flash(
-                "Customer address is required.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("orders")
-            )
-
-        medicine = db.session.get(
-            Medicine,
-            medicine_id
-        )
-
-        if not medicine:
-
-            flash(
-                "Medicine not found.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("orders")
-            )
-
-        if quantity <= 0:
-
-            flash(
-                "Quantity must be greater than zero.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("orders")
-            )
-
-        if quantity > medicine.quantity:
-
-            flash(
-                "Requested quantity is not available.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("orders")
-            )
-
-        unit_price = float(
-            medicine.price
-        )
-
-        total_price = (
-            unit_price *
-            quantity
-        )
-
-        order = Order(
-            customer_name=customer_name,
-            customer_phone=customer_phone,
-            customer_address=customer_address,
-            status="Pending",
-            total_price=total_price
-        )
-
-        db.session.add(order)
-
-        db.session.flush()
-
-        item = OrderItem(
-            order_id=order.id,
-            medicine_id=medicine.id,
-            quantity=quantity,
-            unit_price=unit_price,
-            total_price=total_price
-        )
-
-        db.session.add(item)
-
-        db.session.commit()
-
-        log_activity(
-            f"Public order created: #{order.id}"
-        )
-
-        flash(
-            f"Order #{order.id} placed successfully.",
-            "success"
-        )
 
         return redirect(
             url_for("orders")
