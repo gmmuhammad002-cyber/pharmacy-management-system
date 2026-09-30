@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Pharmacy Care | How It Works{% endblock %}
+{% block content %}
+<section class="care-hero">
+  <div class="care-hero-copy">
+    <div class="page-label">PHARMACY MANAGEMENT, SIMPLIFIED</div>
+    <h1>Everything your pharmacy needs, in one place.</h1>
+    <p>Pharmacy Care is designed to make medicine inventory, sales, orders and daily pharmacy operations easier to manage, faster to understand and safer to control.</p>
+    <div class="care-hero-actions">
+      <a class="btn btn-primary" href="{{ url_for('medicines') }}">Explore Medicines</a>
+      <a class="btn btn-light" href="{{ url_for('login') }}">Admin Login</a>
+    </div>
+  </div>
+  <div class="care-hero-visual">
+    <div class="care-glow"></div>
+    <div class="care-medicine-card">
+      <div class="care-pill">💊</div>
+      <div><strong>Pharmacy Care</strong><span>Smart inventory & workflow</span></div>
+      <div class="care-mini-chart"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+</section>
+
+<section class="care-section">
+  <div class="care-section-heading">
+    <div class="page-label">WHY PHARMACY CARE</div>
+    <h2>Built for everyday pharmacy work</h2>
+    <p>A clean workflow helps staff find information quickly and keep important operations organized.</p>
+  </div>
+  <div class="care-feature-grid">
+    <article class="care-feature"><div class="care-feature-icon">📦</div><h3>Inventory Control</h3><p>Keep medicine quantities, categories, batches and expiry information organized in one system.</p></article>
+    <article class="care-feature"><div class="care-feature-icon">⚠️</div><h3>Stock Awareness</h3><p>Identify low, out-of-stock, expiring and expired medicines quickly from the management interface.</p></article>
+    <article class="care-feature"><div class="care-feature-icon">🧾</div><h3>Sales & Orders</h3><p>Manage sales and customer orders through a structured workflow instead of scattered notes.</p></article>
+    <article class="care-feature"><div class="care-feature-icon">📊</div><h3>Reports</h3><p>Use reports and activity information to understand what is happening in your pharmacy.</p></article>
+    <article class="care-feature"><div class="care-feature-icon">👥</div><h3>Role-Based Access</h3><p>Different staff roles can have different permissions for operational and administrative tasks.</p></article>
+    <article class="care-feature"><div class="care-feature-icon">🔐</div><h3>Accountability</h3><p>Important actions can be recorded so pharmacy activity is easier to review later.</p></article>
+  </div>
+</section>
+
+<section class="care-how">
+  <div class="care-section-heading">
+    <div class="page-label">HOW TO USE IT</div>
+    <h2>From medicine entry to daily operations</h2>
+  </div>
+  <div class="care-steps">
+    <div class="care-step"><span>01</span><div><h3>Add your medicines</h3><p>Enter medicine information such as name, category, price, quantity and expiry details.</p></div></div>
+    <div class="care-step"><span>02</span><div><h3>Organize stock</h3><p>Use batches, suppliers and stock movements to keep inventory information structured.</p></div></div>
+    <div class="care-step"><span>03</span><div><h3>Process sales and orders</h3><p>Record sales and manage orders while keeping stock information connected to the workflow.</p></div></div>
+    <div class="care-step"><span>04</span><div><h3>Review and improve</h3><p>Use reports, logs and inventory status information to monitor the pharmacy.</p></div></div>
+  </div>
+</section>
+
+<section class="care-showcase">
+  <div class="care-showcase-image">
+    <div class="care-image-scene"><div class="scene-shelf"></div><div class="scene-bottle bottle-one">+</div><div class="scene-bottle bottle-two">Rx</div><div class="scene-box">💊</div><div class="scene-screen"><span></span><span></span><span></span></div></div>
+  </div>
+  <div class="care-showcase-copy">
+    <div class="page-label">DESIGNED FOR CLARITY</div>
+    <h2>Less searching. More control.</h2>
+    <p>Pharmacy work moves quickly. The goal of Pharmacy Care is to keep the most useful information close at hand without making the interface complicated.</p>
+    <ul class="care-check-list"><li>Clear medicine and stock information</li><li>Fast search and filtering</li><li>Batch and expiry visibility</li><li>Sales, orders and reporting workflow</li><li>Separate administrative access</li></ul>
+  </div>
+</section>
+
+<section class="care-cta">
+  <div><div class="page-label">READY TO START?</div><h2>Explore Pharmacy Care</h2><p>Browse the medicine catalogue or sign in to access the management tools.</p></div>
+  <div class="care-hero-actions"><a class="btn btn-primary" href="{{ url_for('medicines') }}">View Medicines</a><a class="btn btn-light" href="{{ url_for('login') }}">Admin Login</a></div>
+</section>
+{% endblock %}

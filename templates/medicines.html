@@ -8,6 +8,7 @@
   {% endif %}
 </div>
 
+{% if current_user.is_authenticated %}
 <div class="stats-grid inventory-summary">
   <a class="stat-card" href="{{ url_for('medicines') }}"><div class="stat-icon">💊</div><div><h3>Total</h3><strong>{{ inventory_summary.total if inventory_summary is defined else medicines|length }}</strong></div></a>
   <a class="stat-card warning" href="{{ url_for('medicines', status='low') }}"><div class="stat-icon">⚠️</div><div><h3>Low Stock</h3><strong>{{ inventory_summary.low if inventory_summary is defined else 0 }}</strong></div></a>
@@ -15,6 +16,7 @@
   <a class="stat-card warning" href="{{ url_for('medicines', status='expiring') }}"><div class="stat-icon">⏰</div><div><h3>Expiring Soon</h3><strong>{{ inventory_summary.expiring if inventory_summary is defined else 0 }}</strong></div></a>
   <a class="stat-card danger" href="{{ url_for('medicines', status='expired') }}"><div class="stat-icon">🛑</div><div><h3>Expired</h3><strong>{{ inventory_summary.expired if inventory_summary is defined else 0 }}</strong></div></a>
 </div>
+{% endif %}
 
 <div class="card">
   <form method="GET" action="{{ url_for('medicines') }}" id="medicineSearchForm">

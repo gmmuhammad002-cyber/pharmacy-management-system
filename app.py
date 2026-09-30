@@ -1512,6 +1512,12 @@ def logout():
 # MEDICINES
 # =========================================================
 
+@app.route("/pharmacy-care")
+def pharmacy_care():
+
+    return render_template("pharmacy_care.html")
+
+
 @app.route("/medicines")
 def medicines():
 
