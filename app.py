@@ -743,6 +743,12 @@ class OrderItem(db.Model):
         nullable=False
     )
 
+    fulfilled_quantity = db.Column(
+        db.Integer,
+        nullable=False,
+        default=0
+    )
+
     medicine = db.relationship(
         "Medicine",
         backref="order_items"
@@ -974,6 +980,30 @@ def initialize_database():
                     )
 
             db.session.commit()
+
+        # OrderItem.fulfilled_quantity tracks how many requested units were
+        # actually supplied by an approved order.
+        if "order_item" in inspector.get_table_names():
+
+            order_item_columns = {
+                column["name"]
+                for column in inspector.get_columns("order_item")
+            }
+
+            if "fulfilled_quantity" not in order_item_columns:
+
+                print(
+                    "DATABASE MIGRATION: adding order_item.fulfilled_quantity"
+                )
+
+                db.session.execute(
+                    text(
+                        "ALTER TABLE order_item "
+                        "ADD COLUMN fulfilled_quantity INTEGER DEFAULT 0"
+                    )
+                )
+
+                db.session.commit()
 
         # Sale.batch_id was added when batch-aware FEFO sales were introduced.
         if "sale" in inspector.get_table_names():
@@ -3169,12 +3199,6 @@ def orders():
                 medicine.quantity or 0
             )
 
-            if quantity > available_quantity:
-                raise ValueError(
-                    f"Requested quantity is not available. "
-                    f"Available stock: {available_quantity}."
-                )
-
             unit_price = float(
                 medicine.price or 0
             )
@@ -3197,7 +3221,8 @@ def orders():
                 medicine_id=medicine.id,
                 quantity=quantity,
                 unit_price=unit_price,
-                total_price=total_price
+                total_price=total_price,
+                fulfilled_quantity=0
             )
 
             db.session.add(item)
@@ -3321,6 +3346,8 @@ def update_order_status(id):
             and new_status == "Approved"
         ):
 
+            shortages = []
+
             for item in order.items:
 
                 medicine = db.session.get(
@@ -3334,34 +3361,41 @@ def update_order_status(id):
                         "Medicine no longer exists."
                     )
 
-                if medicine.quantity < item.quantity:
+                current_stock = int(
+                    medicine.quantity or 0
+                )
 
-                    raise ValueError(
-                        f"Not enough stock for {medicine.name}."
+                # Always keep at least 1 unit in stock.
+                fulfillable = max(
+                    min(item.quantity, current_stock - 1),
+                    0
+                )
+
+                shortage = max(
+                    item.quantity - fulfillable,
+                    0
+                )
+
+                item.fulfilled_quantity = fulfillable
+
+                if shortage > 0:
+                    shortages.append(
+                        f"{medicine.name}: {shortage} missing"
                     )
 
-            for item in order.items:
+                previous_quantity = current_stock
+                medicine.quantity = current_stock - fulfillable
 
-                medicine = db.session.get(
-                    Medicine,
-                    item.medicine_id
-                )
-
-                previous_quantity = int(
-                    medicine.quantity
-                )
-
-                medicine.quantity -= item.quantity
-
-                add_stock_movement(
-                    medicine=medicine,
-                    movement_type="Order",
-                    quantity=-item.quantity,
-                    previous_quantity=previous_quantity,
-                    new_quantity=medicine.quantity,
-                    reason="Order approved",
-                    reference=f"Order #{order.id}"
-                )
+                if fulfillable > 0:
+                    add_stock_movement(
+                        medicine=medicine,
+                        movement_type="Order",
+                        quantity=-fulfillable,
+                        previous_quantity=previous_quantity,
+                        new_quantity=medicine.quantity,
+                        reason="Order approved (partial fulfillment allowed)",
+                        reference=f"Order #{order.id}"
+                    )
 
         elif (
             old_status == "Approved"
@@ -3381,12 +3415,22 @@ def update_order_status(id):
                         medicine.quantity
                     )
 
-                    medicine.quantity += item.quantity
+                    restore_quantity = int(
+                        item.fulfilled_quantity or 0
+                    )
+
+                    # Compatibility with old approved orders created before
+                    # fulfilled_quantity existed.
+                    if restore_quantity == 0 and old_status == "Approved":
+                        restore_quantity = item.quantity
+
+                    medicine.quantity += restore_quantity
+                    item.fulfilled_quantity = 0
 
                     add_stock_movement(
                         medicine=medicine,
                         movement_type="Return",
-                        quantity=item.quantity,
+                        quantity=restore_quantity,
                         previous_quantity=previous_quantity,
                         new_quantity=medicine.quantity,
                         reason="Approved order cancelled",
@@ -3402,10 +3446,22 @@ def update_order_status(id):
             f"{old_status} -> {new_status}"
         )
 
-        flash(
-            f"Order #{order.id} updated to {new_status}.",
-            "success"
-        )
+        if (
+            old_status == "Pending"
+            and new_status == "Approved"
+            and shortages
+        ):
+            flash(
+                f"Order #{order.id} approved. "
+                f"Shortage: {', '.join(shortages)}. "
+                "We will supply the missing quantity as soon as possible.",
+                "warning"
+            )
+        else:
+            flash(
+                f"Order #{order.id} updated to {new_status}.",
+                "success"
+            )
 
     except Exception as e:
 
