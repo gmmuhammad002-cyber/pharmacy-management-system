@@ -121,6 +121,10 @@
                     required
                 >
 
+                <small class="form-help">
+                    You can request more than the current stock. At least 1 unit will remain in stock, and any missing quantity will be supplied as soon as possible.
+                </small>
+
             </div>
 
 
@@ -165,6 +169,8 @@
                         <th>Phone</th>
                         <th>Medicine</th>
                         <th>Quantity</th>
+                        <th>Fulfilled</th>
+                        <th>Shortage</th>
                         <th>Total</th>
                         <th>Status</th>
                         <th>Date</th>
@@ -204,6 +210,33 @@
                         <td>
                             {% if order.items %}
                                 {{ order.items[0].quantity }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if order.items %}
+                                {{ order.items[0].fulfilled_quantity|default(0, true) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if order.items %}
+                                {% set requested = order.items[0].quantity|int %}
+                                {% set fulfilled = order.items[0].fulfilled_quantity|default(0, true)|int %}
+                                {% set shortage = requested - fulfilled %}
+                                {% if shortage > 0 %}
+                                    <span class="badge badge-warning">
+                                        {{ shortage }} missing
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-success">
+                                        Complete
+                                    </span>
+                                {% endif %}
                             {% else %}
                                 -
                             {% endif %}
@@ -445,7 +478,9 @@ function showResults(items) {
                 selectedMedicine.innerHTML = `
                     Selected:
                     <strong>${medicine.name}</strong>
-                    — Stock: ${medicine.quantity}
+                    — Current stock: ${medicine.quantity}
+                    <br>
+                    <small>Orders may exceed current stock; at least 1 unit will remain in stock.</small>
                 `;
 
                 selectedMedicine.style.display =
@@ -454,9 +489,6 @@ function showResults(items) {
                 results.style.display =
                     "none";
 
-
-                quantityInput.max =
-                    medicine.quantity;
 
                 quantityInput.value = 1;
 
